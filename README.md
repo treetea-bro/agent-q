@@ -18,7 +18,7 @@ this repo also contains an oss implementation of the research paper [agent q](ht
 2. install dependencies
 
 ```bash
-poetry install
+uv install
 ```
 
 3. start chrome in dev mode - in a seaparate terminal, use the command to start a chrome instance and do necesssary logins to job websites like linkedin/ wellfound, etc.
@@ -26,7 +26,7 @@ poetry install
 for mac, use command -
 
 ```bash
-sudo /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=/Users/peco/chrome_dev_profile
 ```
 
 for linux -

@@ -2,7 +2,6 @@ import json
 from typing import Callable, List, Optional, Tuple, Type
 
 import instructor
-import instructor.patch
 import litellm
 import openai
 from instructor import Mode
@@ -11,7 +10,6 @@ from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
 from agentq.utils.logger import logger
-
 
 class BaseAgent:
     def __init__(
