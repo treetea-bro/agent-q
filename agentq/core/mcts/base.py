@@ -6,7 +6,6 @@ Action = TypeVar("Action")
 Example = TypeVar("Example")
 Trace = tuple[list[State], list[Action]]
 
-
 class WorldModel(ABC, Generic[State, Action, Example]):
     def __init__(self) -> None:
         self.example = None
@@ -35,7 +34,6 @@ class WorldModel(ABC, Generic[State, Action, Example]):
             self.prompt = prompt
         self.example = example
 
-
 class DefaultWorldModel(WorldModel):
     # A default implementation of WorldModel that only
     # saves the action sequence as the state
@@ -53,7 +51,6 @@ class DefaultWorldModel(WorldModel):
     async def is_terminal(self, state):
         # By default the state is never terminal
         return False
-
 
 class SearchConfig(ABC, Generic[State, Action, Example]):
     def __init__(self) -> None:
@@ -74,12 +71,10 @@ class SearchConfig(ABC, Generic[State, Action, Example]):
             self.prompt = prompt
         self.example = example
 
-
 @runtime_checkable
 class AlgorithmOutput(Protocol[State]):
     terminal_state: State
     trace: Trace
-
 
 class SearchAlgorithm(ABC):
     def __init__(self, **kwargs): ...
@@ -88,7 +83,6 @@ class SearchAlgorithm(ABC):
     async def __call__(
         self, world_model: WorldModel, search_config: SearchConfig, **kwargs
     ) -> AlgorithmOutput: ...
-
 
 class Reasoner(ABC, Generic[State, Action, Example]):
     def __init__(

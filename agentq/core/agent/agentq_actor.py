@@ -10,7 +10,6 @@ from agentq.core.prompts.prompts import LLM_PROMPTS
 class AgentQActor(BaseAgent):
     def __init__(self):
         self.name = "actor"
-        self.ltm = None
         self.ltm = self.__get_ltm()
         self.system_prompt = self.__modify_system_prompt(self.ltm)
         super().__init__(

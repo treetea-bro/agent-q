@@ -18,7 +18,6 @@ from agentq.core.mcts.base import (
     WorldModel,
 )
 
-
 class MCTSNode(Generic[State, Action, Example]):
     id_iter = itertools.count()
 
@@ -50,7 +49,8 @@ class MCTSNode(Generic[State, Action, Example]):
         if fast_reward_details is None:
             fast_reward_details = {}
         self.cum_rewards: list[float] = []
-        self.fast_reward = self.reward = fast_reward
+        self.reward = 0.0
+        self.fast_reward = fast_reward
         self.fast_reward_details = fast_reward_details
         self.is_terminal = is_terminal
         self.action = action
@@ -86,7 +86,6 @@ class MCTSNode(Generic[State, Action, Example]):
     def Q(self, value: float):
         self._Q = value  # Setter
 
-
 class MCTSResult(NamedTuple):
     terminal_state: State
     cum_reward: float
@@ -96,7 +95,6 @@ class MCTSResult(NamedTuple):
     trace_in_each_iter: list[list[MCTSNode]] = None
     tree_state_after_each_iter: list[MCTSNode] = None
     aggregated_result: Optional[Hashable] = None
-
 
 class MCTSAggregation(Generic[State, Action, Example], ABC):
     def __init__(
@@ -144,7 +142,6 @@ class MCTSAggregation(Generic[State, Action, Example], ABC):
         if len(answer_dict) == 0:
             return None
         return max(answer_dict, key=lambda answer: answer_dict[answer])
-
 
 class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     def __init__(
@@ -214,8 +211,6 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self.trace_in_each_iter: list[list[MCTSNode]] = None
         self.root: Optional[MCTSNode] = None
         self.disable_tqdm = disable_tqdm
-        self.node_visualizer = node_visualizer
-        self.aggregator = aggregator
         self.node_visualizer = node_visualizer
         self.aggregator = aggregator
 
@@ -336,15 +331,6 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             print(fast_rewards)
             node = node.children[self.simulate_choice(fast_rewards)]
             path.append(node)
-
-    # def _back_propagate(self, path: list[MCTSNode]):
-    #     rewards = []
-    #     cum_reward = -math.inf
-    #     for node in reversed(path):
-    #         rewards.append(node.reward)
-    #         cum_reward = self.cum_reward(rewards[::-1])
-    #         node.cum_rewards.append(cum_reward)
-    #     return cum_reward
 
     def _back_propagate(self, path: list[MCTSNode]):
         reward = path[-1].reward

@@ -6,11 +6,9 @@ from agentq.core.memory import ltm
 from agentq.core.models.models import AgentQCriticInput, AgentQCriticOutput
 from agentq.core.prompts.prompts import LLM_PROMPTS
 
-
 class AgentQCritic(BaseAgent):
     def __init__(self):
         self.name = "critic"
-        self.ltm = None
         self.ltm = self.__get_ltm()
         self.system_prompt = self.__modify_system_prompt(self.ltm)
         super().__init__(

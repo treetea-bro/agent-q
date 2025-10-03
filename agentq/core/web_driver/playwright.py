@@ -14,7 +14,6 @@ from agentq.utils.ui_messagetype import MessageType
 
 # TODO - Create a wrapper browser manager class that either starts a playwright manager (our solution) or a hosted browser manager like browserbase
 
-
 class PlaywrightManager:
     _homepage = "https://google.com"
     _playwright = None
@@ -261,23 +260,15 @@ class PlaywrightManager:
         try:
             browser: BrowserContext = await self.get_browser_context()  # type: ignore
             # Filter out closed pages
-            pages: List[Page] = [page for page in browser.pages if not page.is_closed()]
-            page: Union[Page, None] = pages[-1] if pages else None
+            pages = [page for page in browser.pages if not page.is_closed()]
+            page = pages[-1] if pages else None
             logger.debug(f"Current page: {page.url if page else None}")
             if page is not None:
                 return page
-            else:
-                page: Page = await browser.new_page()  # type: ignore
-                # await stealth_async(page)  # Apply stealth to the new page
-                return page
-        except Exception as e:
-            logger.warn(f"Browser context was closed. Creating a new one. {e}")
-        except Exception as e:
-            logger.warn(f"Browser context was closed. Creating a new one. {e}")
-            PlaywrightManager._browser_context = None
-            _browser: BrowserContext = await self.get_browser_context()  # type: ignore
-            page: Union[Page, None] = await self.get_current_page()
+            page = await browser.new_page()  # type: ignore
             return page
+        except Exception as e:
+            logger.warn(f"Browser context was closed. Creating a new one. {e}")
 
     async def close_all_tabs(self, keep_first_tab: bool = True):
         """
@@ -304,18 +295,29 @@ class PlaywrightManager:
             if page != page_to_keep:  # Check if the current page is not the one to keep
                 await page.close()  # type: ignore
 
-    async def go_to_homepage(self):
-        page: Page = await PlaywrightManager.get_current_page(self)
-        try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
-        except Exception as e:
-            logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
-        try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
-        except Exception as e:
-            logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
+    async def go_to_homepage(self, max_retries: int = 2, timeout: int = 10000):
+        """
+        Navigate to the homepage with retry logic.
+
+        Args:
+            max_retries (int): Maximum number of attempts (default: 2).
+            timeout (int): Timeout per attempt in milliseconds (default: 10000).
+        """
+        page: Page = await self.get_current_page()
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                await page.goto(self._homepage, timeout=timeout)
+                logger.debug(f"Successfully navigated to homepage: {self._homepage}")
+                return
+            except Exception as e:
+                attempt += 1
+                logger.error(
+                    f"Failed to navigate to homepage (attempt {attempt}/{max_retries}): {e}"
+                )
+                if attempt >= max_retries:
+                    logger.error("All attempts to navigate to homepage failed.")
+                    raise
 
     async def set_navigation_handler(self):
         page: Page = await PlaywrightManager.get_current_page(self)
