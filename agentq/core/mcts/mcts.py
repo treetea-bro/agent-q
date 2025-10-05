@@ -1,24 +1,19 @@
 import itertools
 import math
-from abc import ABC
 from collections import defaultdict
 from copy import deepcopy
-from typing import Callable, Generic, Hashable, NamedTuple, Optional
+from typing import Any, Callable, Hashable, NamedTuple, Optional, TypeVar
 
 import numpy as np
 from tqdm import trange
 
-from agentq.core.mcts.base import (
-    Action,
-    Example,
-    SearchAlgorithm,
-    SearchConfig,
-    State,
-    Trace,
-    WorldModel,
-)
+State = TypeVar("State")
+Action = TypeVar("Action")
+Example = TypeVar("Example")
+Trace = tuple[list[State], list[Action]]
 
-class MCTSNode(Generic[State, Action, Example]):
+
+class MCTSNode:
     id_iter = itertools.count()
 
     @classmethod
@@ -86,17 +81,19 @@ class MCTSNode(Generic[State, Action, Example]):
     def Q(self, value: float):
         self._Q = value  # Setter
 
+
 class MCTSResult(NamedTuple):
-    terminal_state: State
+    terminal_state: Any
     cum_reward: float
     trace: Trace
     trace_of_nodes: list[MCTSNode]
     tree_state: MCTSNode
-    trace_in_each_iter: list[list[MCTSNode]] = None
-    tree_state_after_each_iter: list[MCTSNode] = None
+    trace_in_each_iter: list[list[MCTSNode]] | None = None
+    tree_state_after_each_iter: list[MCTSNode] | None = None
     aggregated_result: Optional[Hashable] = None
 
-class MCTSAggregation(Generic[State, Action, Example], ABC):
+
+class MCTSAggregation:
     def __init__(
         self, retrieve_answer: Callable[[State], Hashable], weight_policy: str = "edge"
     ):
@@ -104,9 +101,7 @@ class MCTSAggregation(Generic[State, Action, Example], ABC):
         self.retrieve_answer = retrieve_answer
         self.weight_policy = weight_policy
 
-    def __call__(
-        self, tree_state: MCTSNode[State, Action, Example]
-    ) -> Optional[Hashable]:
+    def __call__(self, tree_state) -> Optional[Hashable]:
         answer_dict = defaultdict(lambda: 0)
 
         def visit(cur: MCTSNode[State, Action, Example]):
@@ -143,7 +138,8 @@ class MCTSAggregation(Generic[State, Action, Example], ABC):
             return None
         return max(answer_dict, key=lambda answer: answer_dict[answer])
 
-class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
+
+class MCTS:
     def __init__(
         self,
         output_trace_in_each_iter: bool = False,
@@ -206,9 +202,9 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         ]
         self.output_strategy = output_strategy
         self.uct_with_fast_reward = uct_with_fast_reward
-        self._output_iter: list[MCTSNode] = None
+        self._output_iter: list[MCTSNode] | None = None
         self._output_cum_reward = -math.inf
-        self.trace_in_each_iter: list[list[MCTSNode]] = None
+        self.trace_in_each_iter: list[list[MCTSNode]] = []
         self.root: Optional[MCTSNode] = None
         self.disable_tqdm = disable_tqdm
         self.node_visualizer = node_visualizer
@@ -217,8 +213,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     async def iterate(self, node: MCTSNode) -> list[MCTSNode]:
         path = self._select(node)
         print("Selected Node")
-        #print(path[-1])
-        #print(path[-1].state.url)
+        # print(path[-1])
+        # print(path[-1].state.url)
         # print(path[-1])
         if not self._is_terminal_with_depth_limit(path[-1]):
             print("inside terminal")
@@ -297,7 +293,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
 
         children = []
         print("inside expand")
-        #print(node.state.url)
+        # print(node.state.url)
         # print(node)
         actions = await self.search_config.get_actions(node.state)
         print("Inside actions")
@@ -362,15 +358,13 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             parent=None,
             calc_q=self.calc_q,
         )
-        if self.output_trace_in_each_iter:
-            self.trace_in_each_iter = []
 
         for iter in trange(
             self.n_iters, disable=self.disable_tqdm, desc="MCTS iteration", leave=False
         ):
             print(f"-----iter: {iter}----")
-            #print(self.root.url)
-            #print(self.root)
+            # print(self.root.url)
+            # print(self.root)
             path = await self.iterate(self.root)
             if self.output_trace_in_each_iter:
                 self.trace_in_each_iter.append(deepcopy(path))
@@ -398,8 +392,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
 
     async def __call__(
         self,
-        world_model: WorldModel[State, Action, Example],
-        search_config: SearchConfig[State, Action, Example],
+        world_model,
+        search_config,
         log_file: Optional[str] = None,
         **kwargs,
     ) -> MCTSResult:

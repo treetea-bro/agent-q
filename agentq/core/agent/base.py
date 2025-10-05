@@ -1,4 +1,4 @@
-import json
+import os
 from typing import Callable, List, Optional, Tuple, Type
 
 import instructor
@@ -8,7 +8,9 @@ from langsmith import traceable
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
-from agentq.utils.logger import logger
+
+model = os.getenv("MODEL")
+vlm_model = os.getenv("VLM_MODEL")
 
 
 class BaseAgent:
@@ -30,21 +32,14 @@ class BaseAgent:
             self._initialize_messages()
         self.keep_message_history = keep_message_history
 
-        # Input-output format
         self.input_format = input_format
         self.output_format = output_format
 
-        # litellm 설정 (ollama backend 사용)
-        litellm.logging = False
-
-        # ollama client 초기화
-        # ollama는 litellm에서 openai 호환 API로 호출 가능
         self.client = instructor.from_litellm(
             litellm.completion,
             mode=Mode.JSON,
         )
 
-        # Tools
         self.tools_list = []
         self.executable_functions_list = {}
         if tools:
@@ -103,57 +98,26 @@ class BaseAgent:
                 }
             )
 
+        selectted_model = vlm_model if screenshot else model
+
         while True:
             if len(self.tools_list) == 0:
+                print("111111111111111111111111111111111111111")
                 response = self.client.chat.completions.create(
-                    model="ollama/qwen3:32b",  # ollama 모델
-                    # model="ollama/gpt-oss:20b",  # ollama 모델
+                    model=selectted_model,
                     messages=self.messages,
                     response_model=self.output_format,
                     max_retries=3,
                 )
+                print("222222222222222222222222222222222222222")
             else:
                 response = self.client.chat.completions.create(
-                    model="ollama/qwen3:32b",  # ollama 모델
-                    # model="ollama/gpt-oss:20b",
+                    model=selectted_model,
                     messages=self.messages,
                     response_model=self.output_format,
                     tool_choice="auto",
                     tools=self.tools_list,
                 )
-
-            try:
-                assert isinstance(response, self.output_format)
-            except AssertionError:
-                raise TypeError(
-                    f"Expected response to be of type {self.output_format.__name__}, but got {type(response).__name__}"
-                )
+            print("333333333333333333333333333333333333333")
 
             return response
-
-    async def _append_tool_response(self, tool_call):
-        function_name = tool_call.function.name
-        function_to_call = self.executable_functions_list[function_name]
-        function_args = json.loads(tool_call.function.arguments)
-        try:
-            function_response = await function_to_call(**function_args)
-            self.messages.append(
-                {
-                    "tool_call_id": tool_call.id,
-                    "role": "tool",
-                    "name": function_name,
-                    "content": str(function_response),
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error occurred calling the tool {function_name}: {str(e)}")
-            self.messages.append(
-                {
-                    "tool_call_id": tool_call.id,
-                    "role": "tool",
-                    "name": function_name,
-                    "content": str(
-                        "The tool responded with an error, please try again with a different tool or modify the parameters of the tool"
-                    ),
-                }
-            )

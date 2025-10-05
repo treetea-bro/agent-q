@@ -1,7 +1,6 @@
 import asyncio
 from typing import List, NamedTuple, Tuple
 
-from agentq.core.mcts.base import Reasoner, SearchConfig, WorldModel
 from agentq.core.mcts.mcts import MCTS, MCTSResult
 
 
@@ -14,7 +13,7 @@ class GridAction(NamedTuple):
     direction: str  # up, down, left, right
 
 
-class GridWorldModel(WorldModel[GridState, GridAction, None]):
+class GridWorldModel:
     def __init__(self, grid: List[List[int]]):
         self.grid = grid
         self.height = len(grid)
@@ -61,7 +60,7 @@ class GridWorldModel(WorldModel[GridState, GridAction, None]):
         return is_terminal(state)
 
 
-class GridSearchConfig(SearchConfig[GridState, GridAction, None]):
+class GridSearchConfig:
     def __init__(self):
         super().__init__()
 
@@ -89,7 +88,7 @@ def is_terminal(state: GridState) -> bool:
     return state.grid[x][y] == 3
 
 
-class MCTSGridWrapper(Reasoner[GridState, GridAction, None]):
+class MCTSGridWrapper:
     def __init__(
         self,
         grid: List[List[int]],

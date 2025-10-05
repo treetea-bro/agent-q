@@ -14,8 +14,9 @@ from agentq.utils.ui_messagetype import MessageType
 
 # TODO - Create a wrapper browser manager class that either starts a playwright manager (our solution) or a hosted browser manager like browserbase
 
+
 class PlaywrightManager:
-    _homepage = "https://google.com"
+    _homepage = "https://youtube.com"
     _playwright = None
     _browser_context = None
     __async_initialize_done = False

@@ -1,11 +1,16 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import asyncio
-import sys
+
+# from agentq.utils.stream_to_file import stream_to_file
+import os
 import textwrap
 from typing import List, Optional, Tuple
 
 import numpy as np
 from colorama import Fore, init
-from dotenv import load_dotenv
 from pydantic import BaseModel
 from pydantic.fields import Field
 
@@ -13,9 +18,7 @@ from agentq.core.agent.agentq_actor import AgentQActor
 from agentq.core.agent.agentq_critic import AgentQCritic
 from agentq.core.agent.base import BaseAgent
 from agentq.core.agent.vision_agent import VisionAgent
-from agentq.core.mcts.base import Reasoner, SearchConfig, WorldModel
 from agentq.core.mcts.mcts import MCTS, MCTSResult
-from agentq.core.mcts.visualization.visualizer_client import visualize
 from agentq.core.models.models import (
     Action,
     ActionType,
@@ -36,9 +39,12 @@ from agentq.core.skills.get_url import geturl
 from agentq.core.skills.open_url import openurl
 from agentq.core.web_driver.playwright import PlaywrightManager
 
-load_dotenv()
-
 init(autoreset=True)
+
+objective = os.getenv("OBJECTIVE", "")
+
+if not objective:
+    raise ValueError("OBJECTIVE environment variable is not set.")
 
 
 class BrowserState(BaseModel):
@@ -53,14 +59,11 @@ class BrowserAction(BaseModel):
     rank: float = Field(description="The rank of this action, higher is better")
 
 
-class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
+class BrowserWorldModel:
     def __init__(self, objective: str, vision: BaseAgent) -> None:
         super().__init__()
         self.objective = objective
         self.vision = vision
-        print(
-            f"{Fore.BLUE}[DEBUG] BrowserWorldModel initialized with objective: {self.objective}"
-        )
 
     async def init_state(self) -> BrowserState:
         initial_dom = await self.get_current_dom()
@@ -159,13 +162,12 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         return url
 
 
-class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
+class BrowserMCTSSearchConfig:
     def __init__(self, actor: BaseAgent, critic: BaseAgent, vision: BaseAgent) -> None:
         super().__init__()
         self.actor = actor
         self.critic = critic
         self.vision = vision
-        print(f"{Fore.BLUE}[DEBUG] BrowserMCTSSearchConfig initialized")
 
     async def get_actions(self, state: BrowserState) -> List[BrowserAction]:
         print(f"{Fore.YELLOW}[DEBUG] Getting actions for current state")
@@ -251,112 +253,6 @@ async def is_terminal(state: BrowserState, vision: BaseAgent) -> bool:
     return vision_output.is_terminal
 
 
-class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
-    def __init__(
-        self,
-        objective: str,
-        actor: BaseAgent,
-        critic: BaseAgent,
-        vision: BaseAgent,
-        n_iterations: int = 1,
-        exploration_weight: float = 1.0,
-    ):
-        world_model = BrowserWorldModel(objective, vision)
-        search_config = BrowserMCTSSearchConfig(actor, critic, vision)
-        search_algo = MCTS(
-            n_iters=n_iterations,
-            w_exp=exploration_weight,
-            cum_reward=sum,
-            calc_q=np.mean,
-            simulate_strategy="max",
-            output_strategy="max_reward",
-            depth_limit=20,
-        )
-        super().__init__(world_model, search_config, search_algo)
-        self.dpo_pairs = []
-        print(
-            f"{Fore.BLUE}[DEBUG] BrowserMCTSWrapper initialized with objective: {objective}"
-        )
-
-    async def __call__(self) -> MCTSResult:
-        print(f"{Fore.YELLOW}[DEBUG] Starting MCTS search")
-        result = await super().__call__("")
-        self.generate_dpo_pairs(result)
-        return result
-
-    def generate_dpo_pairs(self, result: MCTSResult):
-        if result.trace_of_nodes is None or len(result.trace_of_nodes) < 2:
-            return
-
-        print(f"{Fore.BLUE}[DEBUG] Printing rewards before generating dpo pairs")
-        for i in range(len(result.trace_of_nodes)):
-            node = result.trace_of_nodes[i]
-            print(f"{Fore.BLUE} {node.state.url} - {node.Q}")
-
-        for i in range(len(result.trace_of_nodes) - 1):
-            current_node = result.trace_of_nodes[i]
-            next_node = result.trace_of_nodes[i + 1]
-
-            if current_node.children:
-                winning_action = next_node.action
-                for child in current_node.children:
-                    if child.action != winning_action:
-                        self.dpo_pairs.append(
-                            (current_node.state, winning_action, child.action)
-                        )
-
-    def get_dpo_pairs(self):
-        return self.dpo_pairs
-
-    @staticmethod
-    def print_result(result: MCTSResult):
-        if result.trace is None or len(result.trace) == 0:
-            print(f"{Fore.RED}[DEBUG] No valid path found")
-            return
-
-        states, actions = result.trace
-        print(f"{Fore.GREEN}[DEBUG] Path found:")
-        for i, (state, action) in enumerate(zip(states, actions)):
-            print(f"{Fore.CYAN}[DEBUG] Step {i}")
-            print(f"{Fore.CYAN}[DEBUG]  URL: {state.url}")
-            print(f"{Fore.CYAN}[DEBUG]  Action: {action.action.type} - {action}")
-
-        print(f"{Fore.GREEN}[DEBUG] Final URL: {states[-1].url}")
-        print(f"{Fore.GREEN}[DEBUG] Cumulative reward: {result.cum_reward}")
-        print(f"{Fore.GREEN}[DEBUG] Total steps: {len(actions)}")
-
-    @staticmethod
-    def print_dpo_pairs(dpo_pairs):
-        if not dpo_pairs:
-            print(f"{Fore.RED}No DPO pairs generated.")
-            return
-
-        print(f"\n{Fore.MAGENTA}═══════════════ Generated DPO Pairs ═══════════════")
-
-        for i, (state, winning_action, losing_action) in enumerate(dpo_pairs, 1):
-            print(f"\n{Fore.CYAN}╔══ Pair {i} ══╗")
-
-            # Print state (URL and trimmed DOM)
-            print(f"{Fore.YELLOW}┌─ State ─┐")
-            print(f"{Fore.YELLOW}│ URL: {state.url}")
-            trimmed_dom = textwrap.shorten(state.dom, width=100, placeholder="...")
-            print(f"{Fore.YELLOW}│ DOM: {trimmed_dom}")
-
-            # Print winning action
-            print(f"{Fore.GREEN}┌─ Winning Action ─┐")
-            print(f"{Fore.GREEN}│ Type: {winning_action.action.type}")
-            print(f"{Fore.GREEN}│ Details: {winning_action}")
-
-            # Print losing action
-            print(f"{Fore.RED}┌─ Losing Action ─┐")
-            print(f"{Fore.RED}│ Type: {losing_action.action.type}")
-            print(f"{Fore.RED}│ Details: {losing_action}")
-
-            print(f"{Fore.CYAN}╚{'═' * (len('══ Pair X ══') - 2)}╝")
-
-        print(f"\n{Fore.MAGENTA}═══════════════ End of DPO Pairs ═══════════════")
-
-
 async def wait_for_navigation(max_retries=3):
     for attempt in range(max_retries):
         try:
@@ -372,67 +268,111 @@ async def wait_for_navigation(max_retries=3):
     print(f"{Fore.RED}[DEBUG] Navigation failed after {max_retries} attempts")
 
 
+def generate_dpo_pairs(result: MCTSResult):
+    dpo_pairs = []
+    if result.trace_of_nodes is None or len(result.trace_of_nodes) < 2:
+        raise Exception("No valid path found, cannot generate DPO pairs")
+
+    print(f"{Fore.BLUE}[DEBUG] Printing rewards before generating dpo pairs")
+    for i in range(len(result.trace_of_nodes)):
+        node = result.trace_of_nodes[i]
+        print(f"{Fore.BLUE} {node.state.url} - {node.Q}")
+
+    for i in range(len(result.trace_of_nodes) - 1):
+        current_node = result.trace_of_nodes[i]
+        next_node = result.trace_of_nodes[i + 1]
+
+        if current_node.children:
+            winning_action = next_node.action
+            for child in current_node.children:
+                if child.action != winning_action:
+                    dpo_pairs.append((current_node.state, winning_action, child.action))
+    return dpo_pairs
+
+
+def print_result(result: MCTSResult):
+    if result.trace is None or len(result.trace) == 0:
+        print(f"{Fore.RED}[DEBUG] No valid path found")
+        return
+
+    states, actions = result.trace
+    print(f"{Fore.GREEN}[DEBUG] Path found:")
+    for i, (state, action) in enumerate(zip(states, actions)):
+        print(f"{Fore.CYAN}[DEBUG] Step {i}")
+        print(f"{Fore.CYAN}[DEBUG]  URL: {state.url}")
+        print(f"{Fore.CYAN}[DEBUG]  Action: {action.action.type} - {action}")
+
+    print(f"{Fore.GREEN}[DEBUG] Final URL: {states[-1].url}")
+    print(f"{Fore.GREEN}[DEBUG] Cumulative reward: {result.cum_reward}")
+    print(f"{Fore.GREEN}[DEBUG] Total steps: {len(actions)}")
+
+
+def print_dpo_pairs(dpo_pairs):
+    if not dpo_pairs:
+        print(f"{Fore.RED}No DPO pairs generated.")
+        return
+
+    print(f"\n{Fore.MAGENTA}═══════════════ Generated DPO Pairs ═══════════════")
+
+    for i, (state, winning_action, losing_action) in enumerate(dpo_pairs, 1):
+        print(f"\n{Fore.CYAN}╔══ Pair {i} ══╗")
+
+        # Print state (URL and trimmed DOM)
+        print(f"{Fore.YELLOW}┌─ State ─┐")
+        print(f"{Fore.YELLOW}│ URL: {state.url}")
+        trimmed_dom = textwrap.shorten(state.dom, width=100, placeholder="...")
+        print(f"{Fore.YELLOW}│ DOM: {trimmed_dom}")
+
+        # Print winning action
+        print(f"{Fore.GREEN}┌─ Winning Action ─┐")
+        print(f"{Fore.GREEN}│ Type: {winning_action.action.type}")
+        print(f"{Fore.GREEN}│ Details: {winning_action}")
+
+        # Print losing action
+        print(f"{Fore.RED}┌─ Losing Action ─┐")
+        print(f"{Fore.RED}│ Type: {losing_action.action.type}")
+        print(f"{Fore.RED}│ Details: {losing_action}")
+
+        print(f"{Fore.CYAN}╚{'═' * (len('══ Pair X ══') - 2)}╝")
+
+    print(f"\n{Fore.MAGENTA}═══════════════ End of DPO Pairs ═══════════════")
+
+
 async def main():
-    print(f"{Fore.BLUE}Starting MCTS")
     playwright_manager = PlaywrightManager()
     await playwright_manager.async_initialize()
-    print(f"{Fore.GREEN}Browser started and ready")
 
-    print(f"{Fore.BLUE}[DEBUG] Starting main function")
     actor = AgentQActor()
     critic = AgentQCritic()
     vision = VisionAgent()
 
-    objective = "유튜브에서 한국노래 조회수 제일 높은 영상 틀어줘."
-    print(f"{Fore.CYAN}[DEBUG] Objective set: {objective}")
+    print(f"{Fore.CYAN}Objective set: {objective}")
 
-    mcts_wrapper = BrowserMCTSWrapper(
-        objective=objective,
-        actor=actor,
-        critic=critic,
-        vision=vision,
-        n_iterations=30,
-        exploration_weight=1.0,
+    n_iterations: int = 30
+    exploration_weight: float = 1.0
+
+    world_model = BrowserWorldModel(objective, vision)
+    search_config = BrowserMCTSSearchConfig(actor, critic, vision)
+    search_algo = MCTS(
+        n_iters=n_iterations,
+        w_exp=exploration_weight,
+        cum_reward=sum,
+        calc_q=np.mean,
+        simulate_strategy="max",
+        output_strategy="max_reward",
+        depth_limit=20,
     )
 
-    print(f"{Fore.YELLOW}[DEBUG] Running MCTS wrapper")
-    result = await mcts_wrapper()
-    visualize(result=result)
+    result = await search_algo(world_model, search_config)
+    # visualize(result=result)
+    print_result(result)
 
-    print(f"{Fore.CYAN}[DEBUG] Printing MCTS result")
-    BrowserMCTSWrapper.print_result(result)
-
-    dpo_pairs = mcts_wrapper.get_dpo_pairs()
-
-    mcts_wrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
+    dpo_pairs = generate_dpo_pairs(result)
+    print_dpo_pairs(dpo_pairs=dpo_pairs)
 
     await playwright_manager.stop_playwright()
 
 
-class StreamToFile:
-    def __init__(self, filename):
-        self.file = open(filename, "w", buffering=1)
-
-    def write(self, data):
-        self.file.write(data)
-        self.file.flush()
-
-    def flush(self):
-        self.file.flush()
-
-    def close(self):
-        self.file.close()
-
-
 if __name__ == "__main__":
-    print(f"{Fore.BLUE}[DEBUG] Script started")
-    output_stream = StreamToFile("output.txt")
-    sys.stdout = output_stream
-    sys.stderr = output_stream
-    try:
-        asyncio.run(main())
-    finally:
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        output_stream.close()
-    print(f"{Fore.GREEN}[DEBUG] Script finished")
+    # stream_to_file("output.txt")
+    asyncio.run(main())
