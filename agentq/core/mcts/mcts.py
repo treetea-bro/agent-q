@@ -212,12 +212,7 @@ class MCTS:
 
     async def iterate(self, node: MCTSNode) -> list[MCTSNode]:
         path = self._select(node)
-        print("Selected Node")
-        # print(path[-1])
-        # print(path[-1].state.url)
-        # print(path[-1])
         if not self._is_terminal_with_depth_limit(path[-1]):
-            print("inside terminal")
             await self._expand(path[-1])
             await self._simulate(path)
         cum_reward = self._back_propagate(path)
@@ -292,12 +287,7 @@ class MCTS:
             return
 
         children = []
-        print("inside expand")
-        # print(node.state.url)
-        # print(node)
         actions = await self.search_config.get_actions(node.state)
-        print("Inside actions")
-        print(actions)
 
         for action in actions:
             fast_reward, fast_reward_details = self.search_config.fast_reward(
@@ -323,8 +313,6 @@ class MCTS:
             if self._is_terminal_with_depth_limit(node) or len(node.children) == 0:
                 return
             fast_rewards = [child.fast_reward for child in node.children]
-            print("rewards")
-            print(fast_rewards)
             node = node.children[self.simulate_choice(fast_rewards)]
             path.append(node)
 
@@ -363,8 +351,6 @@ class MCTS:
             self.n_iters, disable=self.disable_tqdm, desc="MCTS iteration", leave=False
         ):
             print(f"-----iter: {iter}----")
-            # print(self.root.url)
-            # print(self.root)
             path = await self.iterate(self.root)
             if self.output_trace_in_each_iter:
                 self.trace_in_each_iter.append(deepcopy(path))

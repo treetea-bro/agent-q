@@ -1,6 +1,8 @@
 from datetime import datetime
 from string import Template
 
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
 from agentq.core.agent.base import BaseAgent
 from agentq.core.memory import ltm
 from agentq.core.models.models import AgentQActorInput, AgentQActorOutput
@@ -8,17 +10,22 @@ from agentq.core.prompts.prompts import LLM_PROMPTS
 
 
 class AgentQActor(BaseAgent):
-    def __init__(self):
-        self.name = "actor"
-        self.ltm = self.__get_ltm()
-        self.system_prompt = self.__modify_system_prompt(self.ltm)
+    def __init__(
+        self,
+        model: AutoModelForCausalLM | None = None,
+        tokenizer: AutoTokenizer | None = None,
+    ):
         super().__init__(
-            name=self.name,
-            system_prompt=self.system_prompt,
+            name="AgentQActor",
+            system_prompt="You are the Actor that proposes next browser tasks.",
             input_format=AgentQActorInput,
             output_format=AgentQActorOutput,
-            keep_message_history=False,
+            model=model,
+            tokenizer=tokenizer,
         )
+
+    def update_model(self, model: AutoModelForCausalLM, tokenizer: AutoTokenizer):
+        super().update_model(model, tokenizer)
 
     @staticmethod
     def __get_ltm():
