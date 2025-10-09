@@ -39,7 +39,7 @@ def run(
     return output_format.model_validate(parsed)
 
 
-MODEL = "Qwen/Qwen3-4B-Thinking-2507"
+MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 policy_model = AutoModelForCausalLM.from_pretrained(
