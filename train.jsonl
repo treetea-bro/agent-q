@@ -1,0 +1,10 @@
+{"prompt": "사용자: 안녕?\n", "chosen": "어시스턴트: 안녕하세요! 오늘 기분은 어떠신가요?", "rejected": "어시스턴트: 안녕."}
+{"prompt": "User: Explain what DPO fine-tuning is.\n", "chosen": "Assistant: DPO (Direct Preference Optimization) is a training method that teaches a model to prefer better responses based on human preference pairs.", "rejected": "Assistant: DPO is a model that trains directly on data."}
+{"prompt": "사용자: 대한민국의 수도는 어디야?\n", "chosen": "어시스턴트: 대한민국의 수도는 서울입니다.", "rejected": "어시스턴트: 수도는 여러 곳이 있을 수 있어요."}
+{"prompt": "User: Summarize the importance of climate change.\n", "chosen": "Assistant: Climate change threatens ecosystems, human health, and economies, so global cooperation is essential to mitigate its effects.", "rejected": "Assistant: Climate change is a thing people talk about."}
+{"prompt": "사용자: 내일 비 올까?\n", "chosen": "어시스턴트: 내일은 전국적으로 흐리고 일부 지역에 비가 내릴 가능성이 있습니다.", "rejected": "어시스턴트: 몰라요, 그냥 확인해보세요."}
+{"prompt": "User: Write a polite email declining a meeting.\n", "chosen": "Assistant: Dear [Name],\nThank you for the invitation. Unfortunately, I won’t be able to attend the meeting this time. I appreciate your understanding.\nBest regards,\n[Your Name]", "rejected": "Assistant: I can’t come to the meeting."}
+{"prompt": "사용자: 영어 공부 잘하는 법 알려줘.\n", "chosen": "어시스턴트: 매일 꾸준히 듣기와 말하기 연습을 하고, 영어로 생각하는 습관을 들이면 좋습니다.", "rejected": "어시스턴트: 그냥 외워요."}
+{"prompt": "User: Give me a short Python example for file reading.\n", "chosen": "Assistant:\n```python\nwith open('file.txt', 'r') as f:\n    data = f.read()\nprint(data)\n```", "rejected": "Assistant: Use Python to open a file."}
+{"prompt": "사용자: 넷플릭스 추천해줘.\n", "chosen": "어시스턴트: 최근 인기가 많은 '오징어 게임', '더 글로리', '기묘한 이야기' 등을 추천드립니다.", "rejected": "어시스턴트: 그냥 아무거나 봐요."}
+{"prompt": "User: What are LLM hallucinations?\n", "chosen": "Assistant: Hallucinations occur when a language model produces confident but factually incorrect information.", "rejected": "Assistant: Hallucinations are dreams that models have."}

@@ -1,0 +1,5 @@
+{"prompt": "사용자: 커피 많이 마시면 안 좋은 이유가 뭐야?\n", "chosen": "어시스턴트: 카페인을 과다 섭취하면 불면증, 심박수 증가, 위산 분비 증가 등의 부작용이 생길 수 있습니다.", "rejected": "어시스턴트: 커피는 그냥 몸에 안 좋아요."}
+{"prompt": "User: Explain the difference between supervised and unsupervised learning.\n", "chosen": "Assistant: Supervised learning uses labeled data to train models, while unsupervised learning finds patterns in unlabeled data.", "rejected": "Assistant: Supervised learning is better than unsupervised."}
+{"prompt": "사용자: 오늘의 명언 하나 알려줘.\n", "chosen": "어시스턴트: “성공은 준비와 기회의 만남이다.” — 세네카", "rejected": "어시스턴트: 명언은 몰라요."}
+{"prompt": "User: How does gradient checkpointing help in training?\n", "chosen": "Assistant: It reduces memory usage by recomputing intermediate activations during backpropagation.", "rejected": "Assistant: It helps the model train faster by skipping gradients."}
+{"prompt": "사용자: AI랑 인간의 차이점은 뭐야?\n", "chosen": "어시스턴트: AI는 데이터를 기반으로 학습하지만, 인간은 감정과 창의력을 가지고 사고합니다.", "rejected": "어시스턴트: 인간은 그냥 다릅니다."}
