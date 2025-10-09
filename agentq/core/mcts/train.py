@@ -18,6 +18,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl.trainer.dpo_config import DPOConfig
 from trl.trainer.dpo_trainer import DPOTrainer
 
+from agentq.core.agent.agentq_actor import AgentQActor
+from agentq.core.agent.agentq_critic import AgentQCritic
 from agentq.core.agent.base import BaseAgent
 from agentq.core.agent.base_vision import BaseVisionAgent
 from agentq.core.mcts.mcts import MCTS, MCTSResult
@@ -347,25 +349,17 @@ async def train_loop(
     num_iterations: int = 3,
     output_dir: str = "./dpo_final",
 ):
-    """
-    🔁 AgentQ self-training loop (MCTS + DPO)
-    - 매 루프마다 policy_model을 메모리 내에서 업데이트
-    - 중간 checkpoint 파일 생성 없음
-    - 마지막 루프 끝난 후에만 모델 저장
-    """
-
     objective = os.getenv("OBJECTIVE", "")
-    model_path = os.getenv("MODEL", "")  # 학습 시작용 모델 (ex: "Qwen/Qwen2.5-7B")
-
-    if not objective:
-        raise ValueError("OBJECTIVE environment variable is not set.")
+    model_path = os.getenv("MODEL", "")
 
     playwright_manager = PlaywrightManager()
     await playwright_manager.async_initialize()
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     policy_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto")
-    ref_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto")
+    actor = AgentQActor()
+    critic = AgentQCritic()
+    vision = VisionAgent()
 
     # === Actor, Critic, VisionAgent 초기화 ===
     actor = BaseAgent(
@@ -376,6 +370,9 @@ async def train_loop(
         model=policy_model,
         tokenizer=tokenizer,
     )
+
+    # critic = AgentQCritic()
+    # vision = VisionAgent()
     critic = BaseAgent(
         name="Critic",
         system_prompt="You are the Critic. Evaluate and rank tasks as JSON.",
@@ -447,7 +444,7 @@ async def train_loop(
 
         trainer = DPOTrainer(
             model=policy_model,
-            ref_model=ref_model,
+            ref_model=None,
             args=dpo_args,
             train_dataset=train_dataset,
             processing_class=tokenizer,
