@@ -41,10 +41,9 @@ from transformers import (
 
 # TRL imports (support both old/new paths)
 try:
-    from trl import DPOTrainer
-    from trl.trainer.dpo_config import DPOConfig
+    from trl import DPOConfig, DPOTrainer
 except Exception:
-    from trl.trainer.dpo_config import DPOConfig  # type: ignore
+    from trl import DPOConfig  # type: ignore
     from trl.trainer.dpo_trainer import DPOTrainer  # type: ignore
 
 from peft import LoraConfig
@@ -52,7 +51,7 @@ from peft import LoraConfig
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", default="Qwen/Qwen3-4B-Thinking-2507")
+    p.add_argument("--model", default="Qwen/Qwen3-30B-A3B-Instruct-2507")
     p.add_argument("--train_file", type=str, required=False, help="Path to train.jsonl")
     p.add_argument("--eval_file", type=str, required=False, help="Path to eval.jsonl")
     p.add_argument("--output_dir", type=str, default="./dpo-qwen3-4b-thinking")
@@ -256,7 +255,7 @@ def train(args):
         args=dpo_cfg,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         peft_config=peft_cfg,
     )
 
@@ -282,7 +281,7 @@ def infer(args):
     with torch.no_grad():
         out = model.generate(
             **inputs,
-            max_new_tokens=256,
+            max_new_tokens=1000,
             do_sample=True,
             temperature=0.7,
             top_p=0.9,
