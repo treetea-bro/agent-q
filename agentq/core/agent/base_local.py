@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Callable, List, Optional, Tuple, Type
 
 import torch
@@ -112,7 +113,9 @@ class BaseAgent:
             generated_tokens, skip_special_tokens=True
         ).strip()
 
-        print("decoded", decoded)
+        json_str = re.search(r"\{[\s\S]*\}", decoded)
+        if json_str:
+            parsed = json.loads(json_str.group())
 
         # === Parse and validate ===
         return self.output_format.model_validate(decoded)
