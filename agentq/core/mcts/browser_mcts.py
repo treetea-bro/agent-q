@@ -8,6 +8,7 @@ import os
 from typing import List, Tuple
 
 import numpy as np
+import torch
 from datasets import Dataset
 from langsmith import traceable
 from playwright.async_api import Page
