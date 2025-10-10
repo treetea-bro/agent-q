@@ -552,7 +552,7 @@ def build_tokenizer(model_name: str):
 
 async def train_loop(
     objective: str,
-    model_name: str = "Qwen/Qwen3-4B-Instruct-2507",
+    model_name: str,
     eval_mode: bool = False,
     num_iterations: int = 3,
     output_dir: str = "./dpo_final",
@@ -662,7 +662,12 @@ class StreamToFile:
 
 if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
-    asyncio.run(train_loop(objective="가장 조회수 높은 영상 틀어줘."))
+    asyncio.run(
+        train_loop(
+            objective="가장 조회수 높은 영상 틀어줘.",
+            model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+        )
+    )
     # output_stream = StreamToFile("output.txt")
     # # sys.stdout = output_stream
     # # sys.stderr = output_stream
