@@ -1,5 +1,4 @@
 import json
-import re
 from typing import Callable, List, Optional, Tuple, Type
 
 import torch
@@ -54,25 +53,6 @@ class BaseAgent:
 
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
-
-    def _extract_assistant_json(self, text: str):
-        """
-        간소화 버전:
-        - 'assistant' 이후 나오는 첫 번째 JSON 블록만 추출.
-        - 정규식으로 JSON 블록 감지.
-        """
-        match = re.search(r"assistant[:\s\n]*({.*})", text, re.DOTALL | re.IGNORECASE)
-        if not match:
-            raise ValueError(
-                f"[BaseAgent] No JSON found after 'assistant':\n{text[:300]}"
-            )
-        json_str = match.group(1).strip()
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(
-                f"[BaseAgent] JSON parsing failed: {e}\nExtracted:\n{json_str[:300]}"
-            )
 
     @traceable(run_type="chain", name="agent_run")
     async def run(
@@ -132,10 +112,8 @@ class BaseAgent:
             generated_tokens, skip_special_tokens=True
         ).strip()
 
-        print("decoded", decoded)
         # === Parse and validate ===
-        parsed = self._extract_assistant_json(decoded)
-        return self.output_format.model_validate(parsed)
+        return self.output_format.model_validate(decoded)
 
     async def _append_tool_response(self, tool_call):
         function_name = tool_call.function.name
