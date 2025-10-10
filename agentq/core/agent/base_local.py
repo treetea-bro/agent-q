@@ -101,10 +101,10 @@ class BaseAgent:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=5000,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
+                max_new_tokens=2000,
+                do_sample=False,
+                # temperature=0.3,
+                # top_p=0.9,
             )
 
         # === Decode only newly generated tokens ===
