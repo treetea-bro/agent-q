@@ -112,6 +112,8 @@ class BaseAgent:
             generated_tokens, skip_special_tokens=True
         ).strip()
 
+        print("decoded", decoded)
+
         # === Parse and validate ===
         return self.output_format.model_validate(decoded)
 
