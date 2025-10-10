@@ -55,108 +55,113 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    # 🧩 NEW: helper to extract JSON after "assistant"
+    def _extract_assistant_json(self, text: str):
+        """
+        Extracts only the JSON block that appears after 'assistant:' in model output.
+        Handles nested braces safely.
+        """
+        # 'assistant' 이후 부분만 찾기
+        start_match = re.search(r"assistant[:\s\n]*\{", text, re.IGNORECASE)
+        if not start_match:
+            raise ValueError(
+                f"No JSON found after 'assistant' in decoded output:\n{text[:500]}"
+            )
 
+        start_index = start_match.start()  # 'assistant' 위치
+        brace_start = text.find("{", start_index)
+        if brace_start == -1:
+            raise ValueError(
+                f"Could not find opening '{{' after assistant:\n{text[:500]}"
+            )
 
-def _extract_assistant_json(self, text: str):
-    """
-    Extracts only the JSON block that appears after 'assistant:' in model output.
-    Handles nested braces safely.
-    """
-    # 'assistant' 이후 부분만 찾기
-    start_match = re.search(r"assistant[:\s\n]*\{", text, re.IGNORECASE)
-    if not start_match:
-        raise ValueError(
-            f"No JSON found after 'assistant' in decoded output:\n{text[:500]}"
-        )
+        # 중괄호 균형 맞춰서 JSON 끝 찾기
+        brace_count = 0
+        end_index = None
+        for i in range(brace_start, len(text)):
+            if text[i] == "{":
+                brace_count += 1
+            elif text[i] == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    end_index = i
+                    break
 
-    start_index = start_match.start()  # 'assistant' 위치
-    brace_start = text.find("{", start_index)
-    if brace_start == -1:
-        raise ValueError(f"Could not find opening '{{' after assistant:\n{text[:500]}")
+        if end_index is None:
+            raise ValueError(
+                f"Unbalanced JSON braces in model output:\n{text[brace_start : brace_start + 500]}"
+            )
 
-    # 중괄호 균형 맞춰서 JSON 끝 찾기
-    brace_count = 0
-    end_index = None
-    for i in range(brace_start, len(text)):
-        if text[i] == "{":
-            brace_count += 1
-        elif text[i] == "}":
-            brace_count -= 1
-            if brace_count == 0:
-                end_index = i
-                break
+        json_str = text[brace_start : end_index + 1]
 
-    if end_index is None:
-        raise ValueError(
-            f"Unbalanced JSON braces in model output:\n{text[brace_start : brace_start + 500]}"
-        )
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON after assistant:\n{json_str[:500]}\nError: {e}"
+            )
 
-    json_str = text[brace_start : end_index + 1]
+        @traceable(run_type="chain", name="agent_run")
+        async def run(
+            self,
+            input_data: BaseModel,
+            screenshot: str | None = None,
+            session_id: str | None = None,
+        ) -> BaseModel:
+            if not isinstance(input_data, self.input_format):
+                raise ValueError(
+                    f"Input data must be of type {self.input_format.__name__}"
+                )
 
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"Failed to parse JSON after assistant:\n{json_str[:500]}\nError: {e}"
-        )
+            # Reset messages if history not kept
+            if not self.keep_message_history:
+                self._initialize_messages()
 
-    @traceable(run_type="chain", name="agent_run")
-    async def run(
-        self,
-        input_data: BaseModel,
-        screenshot: str | None = None,
-        session_id: str | None = None,
-    ) -> BaseModel:
-        if not isinstance(input_data, self.input_format):
-            raise ValueError(f"Input data must be of type {self.input_format.__name__}")
-
-        # Reset messages if history not kept
-        if not self.keep_message_history:
-            self._initialize_messages()
-
-        self.messages.append(
-            {
-                "role": "user",
-                "content": input_data.model_dump_json(
-                    exclude={"current_page_dom", "current_page_url"}
-                ),
-            }
-        )
-
-        # Add DOM context if present
-        if hasattr(input_data, "current_page_dom") and hasattr(
-            input_data, "current_page_url"
-        ):
             self.messages.append(
                 {
                     "role": "user",
-                    "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
+                    "content": input_data.model_dump_json(
+                        exclude={"current_page_dom", "current_page_url"}
+                    ),
                 }
             )
 
-        # Build prompt and generate
-        chat_prompt = self.tokenizer.apply_chat_template(
-            self.messages, tokenize=False, add_generation_prompt=True
-        )
+            # Add DOM context if present
+            if hasattr(input_data, "current_page_dom") and hasattr(
+                input_data, "current_page_url"
+            ):
+                self.messages.append(
+                    {
+                        "role": "user",
+                        "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
+                    }
+                )
 
-        inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(self.model.device)
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=512,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
+            # Build prompt and generate
+            chat_prompt = self.tokenizer.apply_chat_template(
+                self.messages, tokenize=False, add_generation_prompt=True
             )
 
-        decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+            inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(
+                self.model.device
+            )
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=512,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.9,
+                )
 
-        # ✅ Parse only JSON after 'assistant'
-        parsed = self._extract_assistant_json(decoded)
+            decoded = self.tokenizer.decode(
+                outputs[0], skip_special_tokens=True
+            ).strip()
 
-        # Validate with output schema
-        return self.output_format.model_validate(parsed)
+            # ✅ Parse only JSON after 'assistant'
+            parsed = self._extract_assistant_json(decoded)
+
+            # Validate with output schema
+            return self.output_format.model_validate(parsed)
 
     async def _append_tool_response(self, tool_call):
         function_name = tool_call.function.name
