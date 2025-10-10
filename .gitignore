@@ -6,3 +6,4 @@ logs/
 .DS_STORE
 results/
 output.txt
+.direnv

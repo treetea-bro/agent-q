@@ -1,11 +1,15 @@
 import asyncio
 import json
-import sys
+import os
 from typing import List, Tuple
 
 import numpy as np
+from datasets import Dataset
 from langsmith import traceable
 from playwright.async_api import Page
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from trl.trainer.dpo_config import DPOConfig
+from trl.trainer.dpo_trainer import DPOTrainer
 
 from agentq.core.agent.agentq_actor import AgentQActor
 from agentq.core.agent.agentq_critic import AgentQCritic
@@ -13,7 +17,6 @@ from agentq.core.agent.base import BaseAgent
 from agentq.core.agent.vision_agent import VisionAgent
 from agentq.core.mcts.core.base import Reasoner, SearchConfig, WorldModel
 from agentq.core.mcts.core.mcts import MCTS, MCTSResult
-from agentq.core.mcts.visualization.visualizer_client import visualize
 from agentq.core.models.models import (
     ActionType,
     AgentQActorInput,
@@ -426,6 +429,54 @@ async def wait_for_navigation(max_retries=3):
     print(f"{RED}[DEBUG] Navigation failed after {max_retries} attempts{RESET}")
 
 
+def pairs_to_dataset(pairs: List[DPOPair]) -> Dataset:
+    """
+    Converts a list of DPOPair objects into a Hugging Face Dataset
+    for DPO training.
+
+    Each DPOPair contains:
+        - state (objective, dom)
+        - winning_action (description, action)
+        - losing_action (description, action)
+
+    Output format per example:
+        {
+            "prompt": "<objective + DOM>",
+            "chosen": "<winning action JSON>",
+            "rejected": "<losing action JSON>"
+        }
+    """
+    rows = []
+
+    for pair in pairs:
+        prompt = f"Objective: {pair.state.objective}\nCurrent DOM: {pair.state.dom}"
+
+        chosen_action = {
+            "description": pair.winning_action.description,
+            "action": json.loads(pair.winning_action.action.model_dump_json()),
+        }
+        rejected_action = {
+            "description": pair.losing_action.description,
+            "action": json.loads(pair.losing_action.action.model_dump_json()),
+        }
+
+        chosen_str = "Action: " + json.dumps(chosen_action, ensure_ascii=False)
+        rejected_str = "Action: " + json.dumps(rejected_action, ensure_ascii=False)
+
+        rows.append(
+            {
+                "prompt": prompt,
+                "chosen": chosen_str,
+                "rejected": rejected_str,
+            }
+        )
+
+    # === 4️⃣ Dataset 변환 ===
+    dataset = Dataset.from_list(rows)
+    print(f"✅ Created DPO dataset with {len(rows)} examples")
+    return dataset
+
+
 async def main(objective: str = None, eval_mode: bool = False):
     print(f"{BLUE}Starting MCTS{RESET}")
     playwright_manager = PlaywrightManager()
@@ -476,6 +527,90 @@ async def main(objective: str = None, eval_mode: bool = False):
     return dpo_pairs
 
 
+async def train_loop(
+    objective: str,
+    model_name: str = "Qwen/Qwen3-4B-Instruct-2507",
+    eval_mode=False,
+    num_iterations: int = 3,
+    output_dir: str = "./dpo_final",
+):
+    print(f"{BLUE}Starting MCTS{RESET}")
+    playwright_manager = PlaywrightManager()
+    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    if not eval_mode:
+        await playwright_manager.async_initialize()
+    else:
+        await playwright_manager.async_initialize(
+            eval_mode=eval_mode, homepage="http://localhost:3000/abc"
+        )
+        page: Page = await playwright_manager.get_current_page()
+        await page.set_extra_http_headers({"User-Agent": "AgentQ-Bot"})
+    print(f"{GREEN}Browser started and ready{RESET}")
+
+    print(f"{BLUE}[DEBUG] Starting main function{RESET}")
+    actor = AgentQActor(model, tokenizer)
+    critic = AgentQCritic(model, tokenizer)
+    vision = VisionAgent()
+
+    print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
+
+    browser_mcts_wrapper = BrowserMCTSWrapper(
+        objective=objective,
+        actor=actor,
+        critic=critic,
+        vision=vision,
+        n_iterations=10,
+        depth_limit=6,
+        exploration_weight=1.0,
+    )
+
+    last_trainer = None
+    for i in range(num_iterations):
+        print(f"\n========== LOOP {i + 1}/{num_iterations} ==========")
+
+        result = await browser_mcts_wrapper()
+
+        print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
+        BrowserMCTSWrapper.print_result(result)
+
+        dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result=result)
+        BrowserMCTSWrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
+
+        train_dataset = pairs_to_dataset(dpo_pairs)
+
+        dpo_args = DPOConfig(
+            output_dir=None,
+            save_strategy="no",
+            logging_strategy="steps",
+            logging_steps=10,
+            num_train_epochs=1,
+            per_device_train_batch_size=1,
+            beta=0.1,
+        )
+
+        trainer = DPOTrainer(
+            model=model,
+            ref_model=None,
+            args=dpo_args,
+            train_dataset=train_dataset,
+            processing_class=tokenizer,
+        )
+
+        trainer.train()
+
+        updated_model = trainer.model
+        actor.update_model(updated_model)
+
+        last_trainer = trainer
+
+    if last_trainer is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        last_trainer.save_model(output_dir)
+        print(f"✅ 최종 모델 저장 → {output_dir}")
+
+
 # Temp class to write output to a file
 class StreamToFile:
     def __init__(self, filename):
@@ -494,18 +629,19 @@ class StreamToFile:
 
 if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
-    output_stream = StreamToFile("output.txt")
-    # sys.stdout = output_stream
-    # sys.stderr = output_stream
-    try:
-        asyncio.run(
-            main(
-                objective="go to football page on bbc",
-                eval_mode=False,
-            )
-        )
-    finally:
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        output_stream.close()
+    asyncio.run(train_loop(objective="네이버에서 안녕이라고 검색해줘."))
+    # output_stream = StreamToFile("output.txt")
+    # # sys.stdout = output_stream
+    # # sys.stderr = output_stream
+    # try:
+    #     asyncio.run(
+    #         main(
+    #             objective="go to football page on bbc",
+    #             eval_mode=False,
+    #         )
+    #     )
+    # finally:
+    #     sys.stdout = sys.__stdout__
+    #     sys.stderr = sys.__stderr__
+    #     output_stream.close()
     print(f"{GREEN}[DEBUG] Script finished{RESET}")

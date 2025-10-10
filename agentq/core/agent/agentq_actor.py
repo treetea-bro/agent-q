@@ -1,19 +1,21 @@
 from datetime import datetime
 from string import Template
 
-from agentq.core.agent.base import BaseAgent
+from agentq.core.agent.base_local import BaseAgent
 from agentq.core.memory import ltm
 from agentq.core.models.models import AgentQActorInput, AgentQActorOutput
 from agentq.core.prompts.prompts import LLM_PROMPTS
 
 
 class AgentQActor(BaseAgent):
-    def __init__(self):
+    def __init__(self, model, tokenizer):
         self.name = "actor"
         self.ltm = None
         self.ltm = self.__get_ltm()
         self.system_prompt = self.__modify_system_prompt(self.ltm)
         super().__init__(
+            model=model,
+            tokenizer=tokenizer,
             name=self.name,
             system_prompt=self.system_prompt,
             input_format=AgentQActorInput,
