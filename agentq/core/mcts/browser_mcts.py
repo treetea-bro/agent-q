@@ -253,7 +253,7 @@ async def is_terminal(state: BrowserState, vision: BaseAgent) -> bool:
     screenshot = await get_screenshot()
     vision_input: VisionInput = VisionInput(objective=state.objective)
     vision_output: VisionOutput = await vision.run(
-        vision_input, screenshot, model="gpt-4o-2024-08-06"
+        vision_input, screenshot, model="gpt-4o-mini"
     )
     print(f"{YELLOW}[DEBUG] Output of vision LLM {vision_output.is_terminal}{RESET}")
     return vision_output.is_terminal

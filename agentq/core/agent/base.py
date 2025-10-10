@@ -4,7 +4,6 @@ from typing import Callable, List, Optional, Tuple, Type
 
 import instructor
 import instructor.patch
-import litellm
 import openai
 from instructor import Mode
 from langsmith import traceable
@@ -41,8 +40,8 @@ class BaseAgent:
         self.output_format = output_format
 
         # Set global configurations for litellm
-        litellm.logging = True
-        litellm.set_verbose = True
+        # litellm.logging = True
+        # litellm.set_verbose = True
 
         # Llm client
         if client == "openai":
@@ -76,7 +75,7 @@ class BaseAgent:
         screenshot: str = None,
         session_id: str = None,
         # model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-        model: str = "gpt-4o-2024-08-06",
+        model: str = "gpt-4o-mini",
     ) -> BaseModel:
         if not isinstance(input_data, self.input_format):
             raise ValueError(f"Input data must be of type {self.input_format.__name__}")
