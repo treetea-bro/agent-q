@@ -213,17 +213,28 @@ async def perform_javascript_click(page: Page, selector: str):
 # ============================================================
 
 
+async def perform_playwright_click(element: ElementHandle, selector: str):
+    """
+    Legacy compatibility shim for imports expecting perform_playwright_click().
+    Internally delegates to element.click() with safe defaults.
+    """
+    try:
+        await element.scroll_into_view_if_needed()
+        await element.wait_for_element_state("visible", timeout=1000)
+        await element.click(timeout=2000, force=False)
+        return f"Performed Playwright click on {selector}"
+    except Exception as e:
+        return f"Legacy perform_playwright_click failed for {selector}: {str(e)}"
+
+
 async def do_click(page: Page, selector: str, wait_before_execution: float):
     """
-    Legacy compatibility shim for older imports expecting do_click().
-    Internally uses the new _robust_click() logic.
+    Legacy compatibility shim for old imports using do_click().
+    Reuses _robust_click() for consistency.
     """
     try:
         result_summary, result_detail = await _robust_click(page, selector)
-        return {
-            "summary_message": result_summary,
-            "detailed_message": result_detail,
-        }
+        return {"summary_message": result_summary, "detailed_message": result_detail}
     except Exception as e:
         return {
             "summary_message": f"do_click() failed for {selector}",
