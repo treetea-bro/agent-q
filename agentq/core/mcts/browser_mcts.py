@@ -185,6 +185,7 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             current_page_dom=state.dom,
             current_page_url=state.url,
         )
+        print("actor_input", actor_input)
         actor_output: AgentQActorOutput = await self.actor.run(actor_input)
 
         proposed_tasks_with_actions: List[TaskWithActions] = actor_output.proposed_tasks
