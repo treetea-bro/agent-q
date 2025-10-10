@@ -100,68 +100,62 @@ class BaseAgent:
                 f"Failed to parse JSON after assistant:\n{json_str[:500]}\nError: {e}"
             )
 
-        @traceable(run_type="chain", name="agent_run")
-        async def run(
-            self,
-            input_data: BaseModel,
-            screenshot: str | None = None,
-            session_id: str | None = None,
-        ) -> BaseModel:
-            if not isinstance(input_data, self.input_format):
-                raise ValueError(
-                    f"Input data must be of type {self.input_format.__name__}"
-                )
+    @traceable(run_type="chain", name="agent_run")
+    async def run(
+        self,
+        input_data: BaseModel,
+        screenshot: str | None = None,
+        session_id: str | None = None,
+    ) -> BaseModel:
+        if not isinstance(input_data, self.input_format):
+            raise ValueError(f"Input data must be of type {self.input_format.__name__}")
 
-            # Reset messages if history not kept
-            if not self.keep_message_history:
-                self._initialize_messages()
+        # Reset messages if history not kept
+        if not self.keep_message_history:
+            self._initialize_messages()
 
+        self.messages.append(
+            {
+                "role": "user",
+                "content": input_data.model_dump_json(
+                    exclude={"current_page_dom", "current_page_url"}
+                ),
+            }
+        )
+
+        # Add DOM context if present
+        if hasattr(input_data, "current_page_dom") and hasattr(
+            input_data, "current_page_url"
+        ):
             self.messages.append(
                 {
                     "role": "user",
-                    "content": input_data.model_dump_json(
-                        exclude={"current_page_dom", "current_page_url"}
-                    ),
+                    "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
                 }
             )
 
-            # Add DOM context if present
-            if hasattr(input_data, "current_page_dom") and hasattr(
-                input_data, "current_page_url"
-            ):
-                self.messages.append(
-                    {
-                        "role": "user",
-                        "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
-                    }
-                )
+        # Build prompt and generate
+        chat_prompt = self.tokenizer.apply_chat_template(
+            self.messages, tokenize=False, add_generation_prompt=True
+        )
 
-            # Build prompt and generate
-            chat_prompt = self.tokenizer.apply_chat_template(
-                self.messages, tokenize=False, add_generation_prompt=True
+        inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=512,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
             )
 
-            inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(
-                self.model.device
-            )
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=512,
-                    do_sample=True,
-                    temperature=0.7,
-                    top_p=0.9,
-                )
+        decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-            decoded = self.tokenizer.decode(
-                outputs[0], skip_special_tokens=True
-            ).strip()
+        # ✅ Parse only JSON after 'assistant'
+        parsed = self._extract_assistant_json(decoded)
 
-            # ✅ Parse only JSON after 'assistant'
-            parsed = self._extract_assistant_json(decoded)
-
-            # Validate with output schema
-            return self.output_format.model_validate(parsed)
+        # Validate with output schema
+        return self.output_format.model_validate(parsed)
 
     async def _append_tool_response(self, tool_call):
         function_name = tool_call.function.name
