@@ -29,7 +29,9 @@ class ActionType(str, Enum):
 # ==============================
 class ClickAction(BaseModel):
     type: Literal[ActionType.CLICK] = Field(description="Click an element by mmid.")
-    mmid: int = Field(description="The mmid of the element to click.")
+    mmid: Union[int, str] = Field(
+        description="The mmid (number or identifier) of the element to click."
+    )
     wait_before_execution: Optional[float] = Field(
         default=None, description="Wait time before executing click."
     )
@@ -39,7 +41,9 @@ class TypeAction(BaseModel):
     type: Literal[ActionType.TYPE] = Field(
         description="Type text into an element by mmid."
     )
-    mmid: int = Field(description="The mmid of the element to type into.")
+    mmid: Union[int, str] = Field(
+        description="The mmid (number or identifier) of the element to type into."
+    )
     content: str = Field(description="The text to type into the element.")
 
 
@@ -55,9 +59,13 @@ class EnterTextAndClickAction(BaseModel):
     type: Literal[ActionType.ENTER_TEXT_AND_CLICK] = Field(
         description="Enter text and click another element."
     )
-    text_element_mmid: int = Field(description="The mmid of the text field.")
+    text_element_mmid: Union[int, str] = Field(
+        description="The mmid of the text field."
+    )
     text_to_enter: str = Field(description="The text to enter.")
-    click_element_mmid: int = Field(description="The mmid of the button to click.")
+    click_element_mmid: Union[int, str] = Field(
+        description="The mmid of the button to click."
+    )
     wait_before_click_execution: Optional[float] = Field(
         default=None, description="Wait time before click execution."
     )
@@ -67,8 +75,12 @@ class SolveCaptcha(BaseModel):
     type: Literal[ActionType.SOLVE_CAPTCHA] = Field(
         description="Solve a captcha and click submit."
     )
-    text_element_mmid: int = Field(description="The mmid of the captcha input element.")
-    click_element_mmid: int = Field(description="The mmid of the submit button.")
+    text_element_mmid: Union[int, str] = Field(
+        description="The mmid of the captcha input element."
+    )
+    click_element_mmid: Union[int, str] = Field(
+        description="The mmid of the submit button."
+    )
     wait_before_click_execution: Optional[float] = Field(
         default=None, description="Wait time before executing captcha click."
     )
