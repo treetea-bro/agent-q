@@ -57,47 +57,21 @@ class BaseAgent:
 
     def _extract_assistant_json(self, text: str):
         """
-        Extracts only the JSON block that appears after 'assistant:' in model output.
-        Handles nested braces safely.
+        간소화 버전:
+        - 'assistant' 이후 나오는 첫 번째 JSON 블록만 추출.
+        - 정규식으로 JSON 블록 감지.
         """
-        # 'assistant' 이후 부분만 찾기
-        start_match = re.search(r"assistant[:\s\n]*\{", text, re.IGNORECASE)
-        if not start_match:
+        match = re.search(r"assistant[:\s\n]*({.*})", text, re.DOTALL | re.IGNORECASE)
+        if not match:
             raise ValueError(
-                f"No JSON found after 'assistant' in decoded output:\n{text[:500]}"
+                f"[BaseAgent] No JSON found after 'assistant':\n{text[:300]}"
             )
-
-        start_index = start_match.start()  # 'assistant' 위치
-        brace_start = text.find("{", start_index)
-        if brace_start == -1:
-            raise ValueError(
-                f"Could not find opening '{{' after assistant:\n{text[:500]}"
-            )
-
-        # 중괄호 균형 맞춰서 JSON 끝 찾기
-        brace_count = 0
-        end_index = None
-        for i in range(brace_start, len(text)):
-            if text[i] == "{":
-                brace_count += 1
-            elif text[i] == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    end_index = i
-                    break
-
-        if end_index is None:
-            raise ValueError(
-                f"Unbalanced JSON braces in model output:\n{text[brace_start : brace_start + 500]}"
-            )
-
-        json_str = text[brace_start : end_index + 1]
-
+        json_str = match.group(1).strip()
         try:
             return json.loads(json_str)
         except json.JSONDecodeError as e:
             raise ValueError(
-                f"Failed to parse JSON after assistant:\n{json_str[:500]}\nError: {e}"
+                f"[BaseAgent] JSON parsing failed: {e}\nExtracted:\n{json_str[:300]}"
             )
 
     @traceable(run_type="chain", name="agent_run")
@@ -130,16 +104,19 @@ class BaseAgent:
             self.messages.append(
                 {
                     "role": "user",
-                    "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
+                    "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
                 }
             )
 
-        # Build prompt and generate
+        # === Build chat prompt ===
         chat_prompt = self.tokenizer.apply_chat_template(
             self.messages, tokenize=False, add_generation_prompt=True
         )
 
+        # === Tokenize & Generate ===
         inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(self.model.device)
+        input_length = inputs["input_ids"].shape[1]  # 기존 prompt 길이
+
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -149,12 +126,14 @@ class BaseAgent:
                 top_p=0.9,
             )
 
-        decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        # === Decode only newly generated tokens ===
+        generated_tokens = outputs[0][input_length:]
+        decoded = self.tokenizer.decode(
+            generated_tokens, skip_special_tokens=True
+        ).strip()
 
-        # ✅ Parse only JSON after 'assistant'
+        # === Parse and validate ===
         parsed = self._extract_assistant_json(decoded)
-
-        # Validate with output schema
         return self.output_format.model_validate(parsed)
 
     async def _append_tool_response(self, tool_call):
