@@ -666,7 +666,8 @@ if __name__ == "__main__":
     asyncio.run(
         train_loop(
             objective="가장 조회수 높은 영상 틀어줘.",
-            model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+            # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+            model_name="Qwen/Qwen3-14B",
         )
     )
     # output_stream = StreamToFile("output.txt")
