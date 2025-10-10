@@ -118,7 +118,7 @@ class BaseAgent:
             parsed = json.loads(json_str.group())
 
         # === Parse and validate ===
-        return self.output_format.model_validate(decoded)
+        return self.output_format.model_validate(parsed)
 
     async def _append_tool_response(self, tool_call):
         function_name = tool_call.function.name
