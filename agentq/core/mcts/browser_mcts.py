@@ -231,6 +231,7 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             )
 
             critic_output: AgentQCriticOutput = await self.critic.run(critic_input)
+            print("critic_output", critic_output)
             top_task = critic_output.top_task
 
             if top_task and top_task.actions_to_be_performed:
@@ -408,7 +409,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
         screenshot = await get_screenshot()
         vision_input: VisionInput = VisionInput(objective=state.objective)
         vision_output: VisionOutput = await self.vision.run(
-            vision_input, screenshot, model="gpt-4o-2024-08-06"
+            vision_input, screenshot, model="gpt-4o-mini"
         )
         print(
             f"{YELLOW}[DEBUG] Output of vision LLM {vision_output.is_terminal}{RESET}"
