@@ -213,7 +213,7 @@ async def perform_javascript_click(page: Page, selector: str):
 # ============================================================
 
 
-async def perform_playwright_click(element: ElementHandle, selector: str):
+async def perform_playwright_click(element, selector: str):
     """
     Legacy compatibility shim for imports expecting perform_playwright_click().
     Internally delegates to element.click() with safe defaults.
