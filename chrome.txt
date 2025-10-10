@@ -1,0 +1,28 @@
+1. 크롬 설치하기 (Ubuntu)
+A. Google 공식 저장소 추가
+
+sudo apt update
+sudo apt install -y wget curl gnupg apt-transport-https software-properties-common
+
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+
+sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
+  > /etc/apt/sources.list.d/google-chrome.list'
+
+sudo apt update
+sudo apt install -y google-chrome-stable
+
+설치 확인:
+google-chrome --version
+
+2. Headless 모드 + 디버그 포트로 실행
+google-chrome \
+  --headless=new \
+  --disable-gpu \
+  --remote-debugging-port=9222 \
+  "--remote-allow-origins=*" \
+  --no-sandbox \
+  about:blank
+
+3. 디버그 포트 확인
+curl http://localhost:9222/json/version
