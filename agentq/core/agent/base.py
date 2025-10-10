@@ -2,10 +2,8 @@ import json
 import os
 from typing import Callable, List, Optional, Tuple, Type
 
-import instructor
-import instructor.patch
 import openai
-from instructor import Mode
+from instructor import Mode, patch
 from langsmith import traceable
 from pydantic import BaseModel
 
@@ -45,14 +43,14 @@ class BaseAgent:
 
         # Llm client
         if client == "openai":
-            self.client = openai.Client()
+            base_client = openai.Client()
         elif client == "together":
-            self.client = openai.OpenAI(
+            base_client = openai.OpenAI(
                 base_url="https://api.together.xyz/v1",
                 api_key=os.environ["TOGETHER_API_KEY"],
             )
 
-        self.client = instructor.from_openai(self.client, mode=Mode.JSON)
+        self.client = patch(base_client, mode=Mode.JSON)
 
         # Tools
         self.tools_list = []
