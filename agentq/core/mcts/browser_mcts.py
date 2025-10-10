@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from datasets import Dataset
 from langsmith import traceable
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from playwright.async_api import Page
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl.trainer.dpo_config import DPOConfig
