@@ -1,11 +1,7 @@
 import json
 from typing import Callable, List, Optional, Tuple, Type
 
-import instructor
-import instructor.patch
-import litellm
 import torch
-from instructor import Mode
 from langsmith import traceable
 from pydantic import BaseModel
 
@@ -41,12 +37,6 @@ class BaseAgent:
         # Input-output format
         self.input_format = input_format
         self.output_format = output_format
-
-        # Set global configurations for litellm
-        litellm.logging = True
-        litellm.set_verbose = True
-
-        self.client = instructor.from_openai(self.client, mode=Mode.JSON)
 
         # Tools
         self.tools_list = []

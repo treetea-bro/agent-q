@@ -629,7 +629,7 @@ class StreamToFile:
 
 if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
-    asyncio.run(train_loop(objective="네이버에서 안녕이라고 검색해줘."))
+    asyncio.run(train_loop(objective="가장 조회수 높은 영상 틀어줘."))
     # output_stream = StreamToFile("output.txt")
     # # sys.stdout = output_stream
     # # sys.stderr = output_stream

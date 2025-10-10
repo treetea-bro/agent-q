@@ -16,7 +16,7 @@ from agentq.utils.ui_messagetype import MessageType
 
 
 class PlaywrightManager:
-    _homepage = "https://google.com"
+    _homepage = "https://youtube.com"
     _playwright = None
     _browser_context = None
     __async_initialize_done = False
@@ -63,7 +63,7 @@ class PlaywrightManager:
         self.set_screenshots_dir(screenshots_dir)
 
     async def async_initialize(
-        self, eval_mode: bool = False, homepage: str = "https://google.com"
+        self, eval_mode: bool = False, homepage: str = "https://youtube.com"
     ):
         """
         Asynchronously initialize necessary components and handlers for the browser context.
