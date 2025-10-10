@@ -11,7 +11,7 @@ import numpy as np
 from datasets import Dataset
 from langsmith import traceable
 from playwright.async_api import Page
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl.trainer.dpo_config import DPOConfig
 from trl.trainer.dpo_trainer import DPOTrainer
 
@@ -540,7 +540,19 @@ async def train_loop(
 ):
     print(f"{BLUE}Starting MCTS{RESET}")
     playwright_manager = PlaywrightManager()
-    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype="bfloat16",  # 또는 "float16"
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+    )
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=bnb_config,
+        device_map="auto",
+    )
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     if not eval_mode:
@@ -592,6 +604,7 @@ async def train_loop(
             num_train_epochs=1,
             per_device_train_batch_size=1,
             beta=0.1,
+            gradient_checkpointing=True,
         )
 
         trainer = DPOTrainer(
