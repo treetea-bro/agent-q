@@ -206,3 +206,26 @@ async def perform_javascript_click(page: Page, selector: str):
         logger.error(f"JS click failed for {selector}: {e}")
         traceback.print_exc()
         return f"Error executing JS click: {e}"
+
+
+# ============================================================
+# ============= Legacy Compatibility Wrapper ================
+# ============================================================
+
+
+async def do_click(page: Page, selector: str, wait_before_execution: float):
+    """
+    Legacy compatibility shim for older imports expecting do_click().
+    Internally uses the new _robust_click() logic.
+    """
+    try:
+        result_summary, result_detail = await _robust_click(page, selector)
+        return {
+            "summary_message": result_summary,
+            "detailed_message": result_detail,
+        }
+    except Exception as e:
+        return {
+            "summary_message": f"do_click() failed for {selector}",
+            "detailed_message": f"Error: {str(e)}",
+        }
