@@ -1,11 +1,12 @@
 from enum import Enum, IntEnum
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
-from pydantic.fields import Field
+from pydantic import BaseModel, Field
 
 
-# Global
+# ==============================
+# Enums
+# ==============================
 class State(str, Enum):
     PLAN = "plan"
     BROWSE = "browse"
@@ -21,81 +22,55 @@ class ActionType(str, Enum):
     GOTO_URL = "GOTO_URL"
     ENTER_TEXT_AND_CLICK = "ENTER_TEXT_AND_CLICK"
     SOLVE_CAPTCHA = "SOLVE_CAPTCHA"
-    # GET_DOM_TEXT_CONTENT = "GET_DOM_TEXT_CONTENT"
-    # GET_DOM_INPUT_FILEDS = "GET_DOM_INPUT_FILEDS"
-    # GET_DOM_ALL_CONTENTS = "GET_DOM_ALL_CONTENTS"
-    # GET_CURRENT_URL = "GET_CURRENT_URL"
 
 
+# ==============================
+# Action Types
+# ==============================
 class ClickAction(BaseModel):
-    type: Literal[ActionType.CLICK] = Field(
-        description="""Executes a click action on the element matching the given mmid attribute value. MMID is always a number. Returns Success if click was successful or appropriate error message if the element could not be clicked."""
-    )
-    mmid: int = Field(
-        description="The mmid number of the element that needs to be clicked e.g. 114. mmid will always be a number"
-    )
+    type: Literal[ActionType.CLICK] = Field(description="Click an element by mmid.")
+    mmid: int = Field(description="The mmid of the element to click.")
     wait_before_execution: Optional[float] = Field(
-        description="Optional wait time in seconds before executing the click event logic"
+        default=None, description="Wait time before executing click."
     )
 
 
 class TypeAction(BaseModel):
     type: Literal[ActionType.TYPE] = Field(
-        description="""Single enter given text in the DOM element matching the given mmid attribute value. This will only enter the text and not press enter or anything else.
-   Returns Success if text entry was successful or appropriate error message if text could not be entered."""
+        description="Type text into an element by mmid."
     )
-    mmid: int = Field(
-        description="The mmid number of the element that needs to be clicked e.g. 114. mmid will always be a number"
-    )
-    content: str = Field(
-        description="The text to enter in the element identified by the query_selector."
-    )
+    mmid: int = Field(description="The mmid of the element to type into.")
+    content: str = Field(description="The text to type into the element.")
 
 
 class GotoAction(BaseModel):
-    type: Literal[ActionType.GOTO_URL] = Field(
-        description="Opens a specified URL in the web browser instance. Returns url of the new page if successful or appropriate error message if the page could not be opened."
-    )
-    website: str = Field(
-        description="The URL to navigate to. Value must include the protocol (http:// or https://)."
-    )
+    type: Literal[ActionType.GOTO_URL] = Field(description="Navigate to a given URL.")
+    website: str = Field(description="Target URL (must include http/https).")
     timeout: Optional[float] = Field(
-        description="Additional wait time in seconds after initial load."
+        default=None, description="Optional wait time after load."
     )
 
 
 class EnterTextAndClickAction(BaseModel):
     type: Literal[ActionType.ENTER_TEXT_AND_CLICK] = Field(
-        description="""Enters text into a specified element and clicks another element, both identified by their mmid. Ideal for seamless actions like submitting search queries, this integrated approach ensures superior performance over separate text entry and click commands. Successfully completes when both actions are executed without errors, returning True; otherwise, it provides False or an explanatory message of any failure encountered."""
+        description="Enter text and click another element."
     )
-    text_element_mmid: int = Field(
-        description="The mmid number of the element where the text will be entered"
-    )
-    text_to_enter: str = Field(
-        description="The text that will be entered into the element specified by text_element_mmid"
-    )
-    click_element_mmid: int = Field(
-        description="The mmid number of the element that will be clicked after text entry."
-    )
+    text_element_mmid: int = Field(description="The mmid of the text field.")
+    text_to_enter: str = Field(description="The text to enter.")
+    click_element_mmid: int = Field(description="The mmid of the button to click.")
     wait_before_click_execution: Optional[float] = Field(
-        description="Optional wait time in seconds before executing the click event logic"
+        default=None, description="Wait time before click execution."
     )
 
 
 class SolveCaptcha(BaseModel):
     type: Literal[ActionType.SOLVE_CAPTCHA] = Field(
-        description="""Solve captcha, enters the solve captcha into a specified element and clicks another element, both identified by their mmid. Ideal for captcha solving ,entering captcha and clicking submit.Successfully completes when all three actions are executed without errors, returning True; otherwise, it provides False or an explanatory message of any failure encountered."""
+        description="Solve a captcha and click submit."
     )
-    text_element_mmid: int = Field(
-        description="The mmid number of the element where the captcha will be entered"
-    )
-
-    click_element_mmid: int = Field(
-        description="The mmid number of the element that will be clicked after the catcha entry to submit"
-    )
-
+    text_element_mmid: int = Field(description="The mmid of the captcha input element.")
+    click_element_mmid: int = Field(description="The mmid of the submit button.")
     wait_before_click_execution: Optional[float] = Field(
-        description="Optional wait time in seconds before executing the click event logic"
+        default=None, description="Wait time before executing captcha click."
     )
 
 
@@ -104,80 +79,67 @@ class Score(IntEnum):
     PASS = 1
 
 
-# class GetDomTextAction(BaseModel):
-#     type: Literal[ActionType.GET_DOM_TEXT_CONTENT]
-
-
-# class GetDomInputsAction(BaseModel):
-#     type: Literal[ActionType.GET_DOM_INPUT_FILEDS]
-
-
-# class GetDomAllAction(BaseModel):
-#     type: Literal[ActionType.GET_DOM_ALL_CONTENTS]
-
-
-# class GetCurrentUrlAction(BaseModel):
-#     type: Literal[ActionType.GET_CURRENT_URL]
-
-
 Action = Union[
     ClickAction,
     TypeAction,
     GotoAction,
     EnterTextAndClickAction,
     SolveCaptcha,
-    # GetDomTextAction,
-    # GetDomInputsAction,
-    # GetDomAllAction,
-    # GetCurrentUrlAction,
 ]
 
 
+# ==============================
+# Task Models
+# ==============================
 class Task(BaseModel):
     id: int
     description: str
-    url: Optional[str]
-    result: Optional[str]
+    url: Optional[str] = None
+    result: Optional[str] = None
 
 
 class TaskWithActions(BaseModel):
     id: int
     description: str
-    actions_to_be_performed: Optional[List[Action]]
-    result: Optional[str]
+    actions_to_be_performed: Optional[List[Action]] = None
+    result: Optional[str] = None
 
 
+# ==============================
+# Memory / Planner / Agents
+# ==============================
 class Memory(BaseModel):
     objective: str
     current_state: State
-    plan: Optional[Union[List[Task], List[TaskWithActions]]]
+    plan: Optional[Union[List[Task], List[TaskWithActions]]] = None
     thought: str
-    completed_tasks: Optional[Union[List[Task], List[TaskWithActions]]]
-    current_task: Optional[Union[Task, TaskWithActions]]
-    final_response: Optional[str]
-    current_tasks_for_eval: Optional[List[TaskWithActions]]
-    sorted_tasks: Optional[List[TaskWithActions]]
+    completed_tasks: Optional[Union[List[Task], List[TaskWithActions]]] = None
+    current_task: Optional[Union[Task, TaskWithActions]] = None
+    final_response: Optional[str] = None
+    current_tasks_for_eval: Optional[List[TaskWithActions]] = None
+    sorted_tasks: Optional[List[TaskWithActions]] = None
 
     class Config:
         use_enum_values = True
 
 
-# Planner
 class PlannerInput(BaseModel):
     objective: str
-    completed_tasks: Optional[List[Task]]
-    task_for_review: Optional[Task]
+    completed_tasks: Optional[List[Task]] = None
+    task_for_review: Optional[Task] = None
 
 
 class PlannerOutput(BaseModel):
-    plan: Optional[List[Task]]
+    plan: Optional[List[Task]] = None
     thought: str
-    next_task: Optional[Task]
+    next_task: Optional[Task] = None
     is_complete: bool
-    final_response: Optional[str]
+    final_response: Optional[str] = None
 
 
-# Executor
+# ==============================
+# Browser Executor
+# ==============================
 class BrowserNavInput(BaseModel):
     task: Task
 
@@ -186,10 +148,12 @@ class BrowserNavOutput(BaseModel):
     completed_task: Task
 
 
-# AgentQ
+# ==============================
+# AgentQ Base / Actor / Critic
+# ==============================
 class AgentQBaseInput(BaseModel):
     objective: str
-    completed_tasks: Optional[List[Task]]
+    completed_tasks: Optional[List[Task]] = None
     current_page_url: str
     current_page_dom: str
 
@@ -197,31 +161,29 @@ class AgentQBaseInput(BaseModel):
 class AgentQBaseOutput(BaseModel):
     thought: str
     plan: List[Task]
-    next_task: Optional[Task]
-    next_task_actions: Optional[List[Action]]
+    next_task: Optional[Task] = None
+    next_task_actions: Optional[List[Action]] = None
     is_complete: bool
-    final_response: Optional[str]
+    final_response: Optional[str] = None
 
 
-# Actor
 class AgentQActorInput(BaseModel):
     objective: str
-    completed_tasks: Optional[List[TaskWithActions]]
+    completed_tasks: Optional[List[TaskWithActions]] = None
     current_page_url: str
     current_page_dom: str
 
 
 class AgentQActorOutput(BaseModel):
     thought: str
-    proposed_tasks: Optional[List[TaskWithActions]]
+    proposed_tasks: Optional[List[TaskWithActions]] = None
     is_complete: bool
-    final_response: Optional[str]
+    final_response: Optional[str] = None
 
 
-# Critic
 class AgentQCriticInput(BaseModel):
     objective: str
-    completed_tasks: Optional[List[TaskWithActions]]
+    completed_tasks: Optional[List[TaskWithActions]] = None
     tasks_for_eval: List[TaskWithActions]
     current_page_url: str
     current_page_dom: str
@@ -232,7 +194,9 @@ class AgentQCriticOutput(BaseModel):
     top_task: TaskWithActions
 
 
-# Vision
+# ==============================
+# Vision / Eval / Captcha
+# ==============================
 class VisionInput(BaseModel):
     objective: str
 
@@ -261,17 +225,19 @@ class CaptchaAgentOutput(BaseModel):
     success: bool
 
 
-# Monte-Carlo
+# ==============================
+# Monte Carlo / DPO
+# ==============================
 class BrowserState(BaseModel):
     dom: str
     url: str
     objective: str
-    completed_tasks: Optional[List[TaskWithActions]]
+    completed_tasks: Optional[List[TaskWithActions]] = None
 
 
 class BrowserAction(BaseModel):
     task_with_action: TaskWithActions
-    rank: float = Field(description="The rank of this action, higher is better")
+    rank: float = Field(description="Higher rank = better action.")
 
 
 class DPOState(BaseModel):
