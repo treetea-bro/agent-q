@@ -231,7 +231,6 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             )
 
             critic_output: AgentQCriticOutput = await self.critic.run(critic_input)
-            print("critic_output", critic_output)
             top_task = critic_output.top_task
 
             if top_task and top_task.actions_to_be_performed:
