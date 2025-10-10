@@ -481,69 +481,26 @@ def pairs_to_dataset(pairs: List[DPOPair]) -> Dataset:
     return dataset
 
 
-async def main(objective: str = None, eval_mode: bool = False):
-    print(f"{BLUE}Starting MCTS{RESET}")
-    playwright_manager = PlaywrightManager()
+# ============ QLoRA Helper ============
 
-    if not eval_mode:
-        await playwright_manager.async_initialize()
-    else:
-        await playwright_manager.async_initialize(
-            eval_mode=eval_mode, homepage="http://localhost:3000/abc"
-        )
-        page: Page = await playwright_manager.get_current_page()
-        await page.set_extra_http_headers({"User-Agent": "AgentQ-Bot"})
-    print(f"{GREEN}Browser started and ready{RESET}")
 
-    print(f"{BLUE}[DEBUG] Starting main function{RESET}")
-    actor = AgentQActor()
-    critic = AgentQCritic()
-    vision = VisionAgent()
-
-    print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
-
-    browser_mcts_wrapper = BrowserMCTSWrapper(
-        objective=objective,
-        actor=actor,
-        critic=critic,
-        vision=vision,
-        n_iterations=10,
-        depth_limit=6,
-        exploration_weight=1.0,
+def print_trainable_params(model):
+    trainable, total = 0, 0
+    for p in model.parameters():
+        total += p.numel()
+        if p.requires_grad:
+            trainable += p.numel()
+    pct = 100 * trainable / total
+    print(
+        f"{CYAN}[LoRA] Trainable params: {trainable:,} / {total:,} ({pct:.2f} %){RESET}"
     )
 
-    print(f"{YELLOW}[DEBUG] Running MCTS wrapper{RESET}")
-    result = await browser_mcts_wrapper()
 
-    # Print results
-    print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
-    BrowserMCTSWrapper.print_result(result)
-
-    # Tree visualization
-    # visualize(result=result)
-
-    # Dpo pairs
-    dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result=result)
-    BrowserMCTSWrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
-    await BrowserMCTSWrapper.write_dpo_pairs_to_file(
-        dpo_pairs=dpo_pairs, filename="dpo_pairs.jsonl"
-    )
-    return dpo_pairs
-
-
-async def train_loop(
-    objective: str,
-    model_name: str = "Qwen/Qwen3-4B-Instruct-2507",
-    eval_mode=False,
-    num_iterations: int = 3,
-    output_dir: str = "./dpo_final",
-):
-    print(f"{BLUE}Starting MCTS{RESET}")
-    playwright_manager = PlaywrightManager()
-
+def build_qlora_policy(model_name: str):
+    """4bit 로드 + LoRA 어댑터 적용"""
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_compute_dtype="bfloat16",  # 또는 "float16"
+        bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
     )
@@ -552,9 +509,58 @@ async def train_loop(
         model_name,
         quantization_config=bnb_config,
         device_map="auto",
+        trust_remote_code=True,
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
+    model = get_peft_model(model, lora_config)
+    print_trainable_params(model)
+    return model
+
+
+def build_tokenizer(model_name: str):
+    tok = AutoTokenizer.from_pretrained(
+        model_name, use_fast=True, trust_remote_code=True
+    )
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    tok.padding_side = "right"
+    return tok
+
+
+async def train_loop(
+    objective: str,
+    model_name: str = "Qwen/Qwen3-4B-Instruct-2507",
+    eval_mode: bool = False,
+    num_iterations: int = 3,
+    output_dir: str = "./dpo_final",
+):
+    print(f"{BLUE}Starting QLoRA-DPO Loop{RESET}")
+    playwright_manager = PlaywrightManager()
+
+    # === 모델 및 토크나이저 로드 ===
+    tokenizer = build_tokenizer(model_name)
+    model = build_qlora_policy(model_name)
+
+    # === 브라우저 초기화 ===
     if not eval_mode:
         await playwright_manager.async_initialize()
     else:
@@ -563,9 +569,10 @@ async def train_loop(
         )
         page: Page = await playwright_manager.get_current_page()
         await page.set_extra_http_headers({"User-Agent": "AgentQ-Bot"})
-    print(f"{GREEN}Browser started and ready{RESET}")
 
+    print(f"{GREEN}Browser started and ready{RESET}")
     print(f"{BLUE}[DEBUG] Starting main function{RESET}")
+
     actor = AgentQActor(model, tokenizer)
     critic = AgentQCritic(model, tokenizer)
     vision = VisionAgent()
@@ -585,15 +592,11 @@ async def train_loop(
     last_trainer = None
     for i in range(num_iterations):
         print(f"\n========== LOOP {i + 1}/{num_iterations} ==========")
-
         result = await browser_mcts_wrapper()
-
-        print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
         BrowserMCTSWrapper.print_result(result)
 
         dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result=result)
         BrowserMCTSWrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
-
         train_dataset = pairs_to_dataset(dpo_pairs)
 
         dpo_args = DPOConfig(
@@ -603,8 +606,14 @@ async def train_loop(
             logging_steps=10,
             num_train_epochs=1,
             per_device_train_batch_size=1,
-            beta=0.1,
+            gradient_accumulation_steps=4,
             gradient_checkpointing=True,
+            bf16=torch.cuda.is_available(),
+            fp16=not torch.cuda.is_available(),
+            beta=0.1,
+            optim="paged_adamw_8bit",
+            remove_unused_columns=False,
+            report_to=["none"],
         )
 
         trainer = DPOTrainer(
@@ -616,16 +625,19 @@ async def train_loop(
         )
 
         trainer.train()
-
         updated_model = trainer.model
         actor.update_model(updated_model)
-
         last_trainer = trainer
+
+        del trainer
+        torch.cuda.empty_cache()
+        gc.collect()
 
     if last_trainer is not None:
         os.makedirs(output_dir, exist_ok=True)
-        last_trainer.save_model(output_dir)
-        print(f"✅ 최종 모델 저장 → {output_dir}")
+        last_trainer.model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        print(f"✅ 최종 LoRA 어댑터 포함 모델 저장 → {output_dir}")
 
 
 # Temp class to write output to a file
