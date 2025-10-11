@@ -501,24 +501,55 @@ def print_trainable_params(model):
 
 
 def build_qlora_policy(model_name: str):
-    """4bit 로드 + LoRA 어댑터 적용"""
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-    )
+    """
+    Automatically detects model quantization type and builds QLoRA policy accordingly.
+    Handles:
+        - MxFP4 / GPTQ / AWQ pre-quantized models → skip BitsAndBytesConfig
+        - Standard FP16/BF16 models → use BitsAndBytesConfig (NF4)
+    """
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map={"": 0},
-        # device_map="auto",
-        trust_remote_code=True,
-    )
+    print(f"{YELLOW}[INFO] Checking model config for quantization type...{RESET}")
+    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 
+    quant_type = getattr(config, "quantization_config", None)
+    quant_str = str(quant_type).lower() if quant_type else "none"
+
+    if any(q in quant_str for q in ["mxfp4", "gptq", "awq", "aqlm"]):
+        print(
+            f"{GREEN}[INFO] Detected pre-quantized model ({quant_type.__class__.__name__ if quant_type else 'Unknown'})"
+        )
+        print(f"{GREEN}[ACTION] Skipping BitsAndBytesConfig — loading as-is.{RESET}")
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+
+    else:
+        print(f"{CYAN}[INFO] No quantization detected or standard FP model.{RESET}")
+        print(
+            f"{CYAN}[ACTION] Applying 4-bit NF4 quantization via BitsAndBytes.{RESET}"
+        )
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+        )
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            quantization_config=bnb_config,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+
+    # Prepare for LoRA fine-tuning
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
 
+    # LoRA 설정
     lora_config = LoraConfig(
         r=16,
         lora_alpha=32,
@@ -537,7 +568,11 @@ def build_qlora_policy(model_name: str):
     )
 
     model = get_peft_model(model, lora_config)
+
+    # 디버그용 파라미터 출력
     print_trainable_params(model)
+
+    print(f"{GREEN}[SUCCESS] QLoRA policy model built successfully!{RESET}")
     return model
 
 
