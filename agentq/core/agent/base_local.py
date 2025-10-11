@@ -108,7 +108,7 @@ class BaseAgent:
             )
             generated_tokens = outputs[0][input_length:].cpu()  # move to CPU
             del outputs
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
         decoded = self.tokenizer.decode(
             generated_tokens, skip_special_tokens=True
