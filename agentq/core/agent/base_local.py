@@ -106,18 +106,19 @@ class BaseAgent:
                 temperature=0.3,
                 top_p=0.9,
             )
-            generated_tokens = outputs[0][input_length:]
-            del outputs
-            # torch.cuda.empty_cache()
 
+        # === Decode only newly generated tokens ===
+        generated_tokens = outputs[0][input_length:]
         decoded = self.tokenizer.decode(
             generated_tokens, skip_special_tokens=True
         ).strip()
-        del generated_tokens
 
-        print("decoded", decoded)
         json_str = re.search(r"\{[\s\S]*\}", decoded)
-        print("json_str", json_str)
+
+        del decoded
+        del generated_tokens
+        del outputs
+        del inputs
 
         if json_str:
             parsed = json.loads(json_str.group())
