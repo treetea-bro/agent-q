@@ -505,7 +505,7 @@ def print_trainable_params(model):
     )
 
 
-def build_qlora_policy(model_name: str):
+def build_qlora_policy(model_name: str, gpu_num: int = 0):
     """
     Automatically detects model quantization type and builds QLoRA policy accordingly.
     Handles:
@@ -527,7 +527,7 @@ def build_qlora_policy(model_name: str):
 
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            device_map={"": 1},
+            device_map={"": gpu_num},
             # device_map="auto",
             trust_remote_code=True,
         )
@@ -548,7 +548,7 @@ def build_qlora_policy(model_name: str):
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             quantization_config=bnb_config,
-            device_map={"": 1},
+            device_map={"": gpu_num},
             # device_map="auto",
             trust_remote_code=True,
         )
@@ -605,7 +605,7 @@ async def train_loop(
 
     # === 모델 및 토크나이저 로드 ===
     tokenizer = build_tokenizer(model_name)
-    model = build_qlora_policy(model_name)
+    model = build_qlora_policy(model_name, 1)
 
     # === 브라우저 초기화 ===
     if not eval_mode:
