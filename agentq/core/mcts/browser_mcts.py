@@ -527,7 +527,7 @@ def build_qlora_policy(model_name: str):
 
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            device_map={"": 0},
+            device_map={"": 1},
             # device_map="auto",
             trust_remote_code=True,
         )
