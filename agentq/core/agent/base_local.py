@@ -115,6 +115,7 @@ class BaseAgent:
         ).strip()
         del generated_tokens
 
+        print("decoded", decoded)
         json_str = re.search(r"\{[\s\S]*\}", decoded)
         print("json_str", json_str)
 
