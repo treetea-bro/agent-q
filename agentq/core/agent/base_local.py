@@ -115,8 +115,11 @@ class BaseAgent:
         ).strip()
 
         json_str = re.search(r"\{[\s\S]*\}", decoded)
-        parsed = json.loads(json_str.group())
-        print("parsed", parsed)
+        print("json_str", json_str)
+
+        if json_str:
+            parsed = json.loads(json_str.group())
+            print("parsed", parsed)
 
         # === Parse and validate ===
         return self.output_format.model_validate(parsed)
