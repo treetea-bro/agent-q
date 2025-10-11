@@ -676,6 +676,8 @@ async def train_loop(
         actor.update_model(updated_model)
         last_trainer = trainer
 
+        # del trainer.model
+        # del trainer.accelerator
         del trainer
         torch.cuda.empty_cache()
         gc.collect()

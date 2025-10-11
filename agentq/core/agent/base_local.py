@@ -106,9 +106,10 @@ class BaseAgent:
                 temperature=0.3,
                 top_p=0.9,
             )
+            generated_tokens = outputs[0][input_length:].cpu()  # move to CPU
+            del outputs
+            torch.cuda.empty_cache()
 
-        # === Decode only newly generated tokens ===
-        generated_tokens = outputs[0][input_length:]
         decoded = self.tokenizer.decode(
             generated_tokens, skip_special_tokens=True
         ).strip()
