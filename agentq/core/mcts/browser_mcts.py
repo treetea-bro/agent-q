@@ -2,9 +2,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
+
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import asyncio
 import json
-import os
 import shutil
 import tempfile
 from typing import List, Tuple
@@ -166,7 +169,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         await wait_for_navigation()
         dom = await get_dom_with_content_type(content_type="all_fields")
         print(f"{CYAN}[DEBUG] Got current DOM (length: {len(dom)}){RESET}")
-        return str(dom)
+        return str(dom)[:1000]
 
     async def get_current_url(self) -> str:
         # await wait_for_navigation()
