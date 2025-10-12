@@ -122,7 +122,9 @@ class BaseAgent:
 
         if json_str:
             parsed = json.loads(json_str.group())
-            print("parsed", parsed)
+            print("parsed", "-" * 50)
+            print(parsed)
+            print("-" * 50)
 
         # === Parse and validate ===
         return self.output_format.model_validate(parsed)

@@ -169,7 +169,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         await wait_for_navigation()
         dom = await get_dom_with_content_type(content_type="all_fields")
         print(f"{CYAN}[DEBUG] Got current DOM (length: {len(dom)}){RESET}")
-        return str(dom)[:1000]
+        return str(dom)[:3000]
 
     async def get_current_url(self) -> str:
         # await wait_for_navigation()
@@ -194,7 +194,9 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             current_page_dom=state.dom,
             current_page_url=state.url,
         )
-        print("actor_input", actor_input)
+        print("actor_input", "-" * 40)
+        print(actor_input)
+        print("-" * 40)
         actor_output: AgentQActorOutput = await self.actor.run(actor_input)
 
         proposed_tasks_with_actions: List[TaskWithActions] = actor_output.proposed_tasks
