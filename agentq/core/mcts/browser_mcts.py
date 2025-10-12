@@ -5,6 +5,8 @@ load_dotenv()
 import asyncio
 import json
 import os
+import shutil
+import tempfile
 from typing import List, Tuple
 
 import numpy as np
@@ -590,10 +592,6 @@ def build_tokenizer(model_name: str):
         tok.pad_token = tok.eos_token
     tok.padding_side = "right"
     return tok
-
-
-import shutil
-import tempfile
 
 
 async def train_loop(
