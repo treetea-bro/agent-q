@@ -745,7 +745,7 @@ if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     asyncio.run(
         train_loop(
-            objective="무한도전 최신화 틀어줘",
+            objective="Play the latest episode of Friends.",
             # model_name="openai/gpt-oss-20b",
             # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
             # model_name="Qwen/Qwen3-4B-Instruct-2507",
