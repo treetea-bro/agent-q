@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
-import gc
 import json
 import os
 from typing import List, Tuple
@@ -593,6 +592,10 @@ def build_tokenizer(model_name: str):
     return tok
 
 
+import shutil
+import tempfile
+
+
 async def train_loop(
     objective: str,
     model_name: str,
@@ -603,9 +606,14 @@ async def train_loop(
     print(f"{BLUE}Starting QLoRA-DPO Loop{RESET}")
     playwright_manager = PlaywrightManager()
 
-    # === 모델 및 토크나이저 로드 ===
+    # === 토크나이저 공용 ===
     tokenizer = build_tokenizer(model_name)
-    model = build_qlora_policy(model_name, 1)
+
+    # === 모델 두 개 분리 로드 ===
+    # 추론 전용: GPU 1
+    model_infer = build_qlora_policy(model_name, gpu_num=1)
+    # 학습 전용: GPU 0
+    model_train = build_qlora_policy(model_name, gpu_num=0)
 
     # === 브라우저 초기화 ===
     if not eval_mode:
@@ -620,9 +628,10 @@ async def train_loop(
     print(f"{GREEN}Browser started and ready{RESET}")
     print(f"{BLUE}[DEBUG] Starting main function{RESET}")
 
-    actor = AgentQActor(model, tokenizer)
-    critic = AgentQCritic(model, tokenizer)
-    vision = VisionAgent()
+    # 추론 에이전트는 GPU1의 model_infer 사용
+    actor = AgentQActor(model_infer, tokenizer)
+    critic = AgentQCritic(model_infer, tokenizer)
+    vision = VisionAgent()  # 외부 API 기반이면 GPU 미사용
 
     print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
 
@@ -636,9 +645,38 @@ async def train_loop(
         exploration_weight=1.0,
     )
 
+    # ---- LoRA 어댑터 동기화 유틸 ----
+    def sync_lora_adapters(src_peft_model, dst_peft_model):
+        """
+        src(학습모델)의 LoRA 어댑터 가중치를 임시 디렉토리에 저장 후
+        dst(추론모델)에 로드한다. PEFT 호환 방식을 사용해 안전하게 동기화.
+        """
+        tmpdir = tempfile.mkdtemp(prefix="lora_sync_")
+        try:
+            # LoRA 어댑터만 저장 (merge 하지 않음)
+            src_peft_model.save_pretrained(tmpdir)
+            # 추론모델에 어댑터 로드
+            # 최신 peft는 load_adapter 지원. 없으면 state_dict로 대체.
+            try:
+                dst_peft_model.load_adapter(
+                    tmpdir, adapter_name="default", is_trainable=False
+                )
+                if hasattr(dst_peft_model, "set_adapter"):
+                    dst_peft_model.set_adapter("default")
+            except Exception:
+                # fallback: 상태 dict 직접 로드 (strict=False)
+                dst_peft_model.load_state_dict(
+                    src_peft_model.state_dict(), strict=False
+                )
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
     last_trainer = None
+
     for i in range(num_iterations):
         print(f"\n========== LOOP {i + 1}/{num_iterations} ==========")
+
+        # ---- 1) MCTS로 데이터 수집 (GPU1 / model_infer) ----
         result = await browser_mcts_wrapper()
         BrowserMCTSWrapper.print_result(result)
 
@@ -646,6 +684,7 @@ async def train_loop(
         BrowserMCTSWrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
         train_dataset = pairs_to_dataset(dpo_pairs)
 
+        # ---- 2) DPO 학습 (GPU0 / model_train) ----
         dpo_args = DPOConfig(
             output_dir=None,
             save_strategy="no",
@@ -664,7 +703,7 @@ async def train_loop(
         )
 
         trainer = DPOTrainer(
-            model=model,
+            model=model_train,
             ref_model=None,
             args=dpo_args,
             train_dataset=train_dataset,
@@ -672,15 +711,14 @@ async def train_loop(
         )
 
         trainer.train()
-        updated_model = trainer.model
-        actor.update_model(updated_model)
         last_trainer = trainer
 
-        # del trainer.model
-        # del trainer.accelerator
+        print(f"{YELLOW}[INFO] Syncing LoRA adapters: train(GPU0) → infer(GPU1){RESET}")
+        sync_lora_adapters(trainer.model, model_infer)
+
+        actor.update_model(model_infer)
+
         del trainer
-        torch.cuda.empty_cache()
-        gc.collect()
 
     if last_trainer is not None:
         os.makedirs(output_dir, exist_ok=True)
@@ -709,7 +747,7 @@ if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     asyncio.run(
         train_loop(
-            objective="가장 조회수 높은 영상 틀어줘.",
+            objective="무한도전 최신화 틀어줘",
             # model_name="openai/gpt-oss-20b",
             # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
             # model_name="Qwen/Qwen3-4B-Instruct-2507",
