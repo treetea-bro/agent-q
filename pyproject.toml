@@ -32,4 +32,5 @@ dependencies = [
     "transformers>=4.57.0",
     "trl>=0.23.1",
     "typing-extensions>=4.15.0",
+    "unsloth>=2025.10.1",
 ]
