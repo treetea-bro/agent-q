@@ -1,13 +1,27 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-
 import os
 
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ["OMP_NUM_THREADS"] = "16"  # (CPU 코어 수에 맞게)
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import torch
+from datasets import Dataset
+from transformers import TrainingArguments
+from unsloth import FastLanguageModel
+from unsloth.trl import DPOTrainer
+
+from agentq.core.agent.agentq_actor import AgentQActor
+from agentq.core.agent.agentq_critic import AgentQCritic
+from agentq.core.agent.vision_agent import VisionAgent
+from agentq.core.mcts.browser_mcts import BrowserMCTSWrapper, pairs_to_dataset
+from agentq.core.web_driver.playwright import PlaywrightManager
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
+
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.benchmark = False
+
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
@@ -19,7 +33,6 @@ import tempfile
 from typing import List, Tuple
 
 import numpy as np
-from datasets import Dataset
 from langsmith import traceable
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from playwright.async_api import Page
@@ -32,10 +45,7 @@ from transformers import (
 from trl.trainer.dpo_config import DPOConfig
 from trl.trainer.dpo_trainer import DPOTrainer
 
-from agentq.core.agent.agentq_actor import AgentQActor
-from agentq.core.agent.agentq_critic import AgentQCritic
 from agentq.core.agent.base import BaseAgent
-from agentq.core.agent.vision_agent import VisionAgent
 from agentq.core.mcts.core.base import Reasoner, SearchConfig, WorldModel
 from agentq.core.mcts.core.mcts import MCTS, MCTSResult
 from agentq.core.models.models import (
@@ -60,7 +70,6 @@ from agentq.core.skills.get_dom_with_content_type import get_dom_with_content_ty
 from agentq.core.skills.get_screenshot import get_screenshot
 from agentq.core.skills.get_url import geturl
 from agentq.core.skills.open_url import openurl
-from agentq.core.web_driver.playwright import PlaywrightManager
 
 # ANSI color codes
 BLUE = "\033[94m"
@@ -749,35 +758,194 @@ class StreamToFile:
         self.file.close()
 
 
-objectives = [
-    "Play the latest episode of Friends.",
-    "Play the most viewd pokemon movie",
-    "Play the most viewd movie in youtube",
-]
+# objectives = [
+#     "Play the latest episode of Friends.",
+#     "Play the most viewd pokemon movie",
+#     "Play the most viewd movie in youtube",
+# ]
 
+# if __name__ == "__main__":
+#     print(f"{BLUE}[DEBUG] Script started{RESET}")
+#     asyncio.run(
+#         train_loop(
+#             objectives=objectives,
+#             # model_name="openai/gpt-oss-20b",
+#             model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+#             # model_name="Qwen/Qwen3-4B-Instruct-2507",
+#             # model_name="Qwen/Qwen2.5-14B-Instruct",
+#         )
+#     )
+#     # output_stream = StreamToFile("output.txt")
+#     # # sys.stdout = output_stream
+#     # # sys.stderr = output_stream
+#     # try:
+#     #     asyncio.run(
+#     #         main(
+#     #             objective="go to football page on bbc",
+#     #             eval_mode=False,
+#     #         )
+#     #     )
+#     # finally:
+#     #     sys.stdout = sys.__stdout__
+#     #     sys.stderr = sys.__stderr__
+#     #     output_stream.close()
+#     print(f"{GREEN}[DEBUG] Script finished{RESET}")
+
+
+def build_unsloth_policy(model_name: str, max_seq_len: int = 2048):
+    print(f"{YELLOW}[INFO] Loading {model_name} via Unsloth (QLoRA 4-bit){RESET}")
+
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_name,
+        max_seq_length=max_seq_len,
+        load_in_4bit=True,  # NF4 quantization
+        dtype=None,  # Auto: bf16 / fp16
+        device_map="auto",
+        use_gradient_checkpointing=True,
+    )
+
+    # LoRA 어댑터 설정
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        bias="none",
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+    )
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+
+    print(f"{GREEN}[SUCCESS] Unsloth policy built successfully!{RESET}")
+    return model, tokenizer
+
+
+# =====================
+# Main Train Loop
+# =====================
+async def train_loop_unsloth(
+    objectives: list[str],
+    model_name: str,
+    output_dir: str = "./dpo_final_unsloth",
+    eval_mode: bool = False,
+):
+    print(f"{BLUE}Starting Unsloth QLoRA-DPO Loop{RESET}")
+    playwright_manager = PlaywrightManager()
+    await playwright_manager.async_initialize()
+
+    # ---- 모델 / 토크나이저 로드 ----
+    model_train, tokenizer = build_unsloth_policy(model_name)
+
+    # ---- 에이전트 초기화 ----
+    actor = AgentQActor(model_train, tokenizer)
+    critic = AgentQCritic(model_train, tokenizer)
+    vision = VisionAgent()
+
+    def sync_lora_adapters(src_peft_model, dst_peft_model):
+        """LoRA adapter weight sync"""
+        import shutil
+        import tempfile
+
+        tmpdir = tempfile.mkdtemp(prefix="lora_sync_")
+        try:
+            src_peft_model.save_pretrained(tmpdir)
+            try:
+                dst_peft_model.load_adapter(
+                    tmpdir, adapter_name="default", is_trainable=False
+                )
+                if hasattr(dst_peft_model, "set_adapter"):
+                    dst_peft_model.set_adapter("default")
+            except Exception:
+                dst_peft_model.load_state_dict(
+                    src_peft_model.state_dict(), strict=False
+                )
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    last_trainer = None
+    for i, objective in enumerate(objectives):
+        print(f"\n========== LOOP {i + 1}/{len(objectives)} ==========")
+        browser_mcts_wrapper = BrowserMCTSWrapper(
+            objective=objective,
+            actor=actor,
+            critic=critic,
+            vision=vision,
+            n_iterations=10,
+            depth_limit=6,
+            exploration_weight=1.0,
+        )
+
+        # === 1️⃣ MCTS로 DPO Pair 생성 ===
+        result = await browser_mcts_wrapper()
+        dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result)
+        train_dataset = pairs_to_dataset(dpo_pairs)
+
+        # === 2️⃣ DPO 학습 ===
+        print(f"{YELLOW}[INFO] Training DPO with Unsloth Trainer{RESET}")
+        training_args = TrainingArguments(
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=4,
+            learning_rate=2e-5,
+            num_train_epochs=1,
+            bf16=True,
+            optim="paged_adamw_32bit",
+            lr_scheduler_type="cosine",
+            warmup_ratio=0.05,
+            remove_unused_columns=False,
+            report_to=["none"],
+            logging_steps=10,
+            output_dir=output_dir,
+            save_strategy="no",
+        )
+
+        trainer = DPOTrainer(
+            model=model_train,
+            ref_model=None,
+            tokenizer=tokenizer,
+            train_dataset=train_dataset,
+            args=training_args,
+        )
+
+        trainer.train()
+        last_trainer = trainer
+
+        print(f"{YELLOW}[INFO] Syncing LoRA adapters (train → infer){RESET}")
+        sync_lora_adapters(trainer.model, model_train)
+        actor.update_model(model_train)
+
+        del trainer
+
+    if last_trainer is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        last_trainer.model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        print(f"✅ 최종 LoRA 어댑터 포함 모델 저장 → {output_dir}")
+
+
+# =====================
+# Entry
+# =====================
 if __name__ == "__main__":
-    print(f"{BLUE}[DEBUG] Script started{RESET}")
+    import asyncio
+
+    objectives = [
+        "Play the latest episode of Friends.",
+        "Play the most viewed Pokemon movie.",
+        "Play the most viewed movie on YouTube.",
+    ]
     asyncio.run(
-        train_loop(
+        train_loop_unsloth(
             objectives=objectives,
-            # model_name="openai/gpt-oss-20b",
-            model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-            # model_name="Qwen/Qwen3-4B-Instruct-2507",
-            # model_name="Qwen/Qwen2.5-14B-Instruct",
+            model_name="Qwen/Qwen3-30B-A3B-Instruct",
         )
     )
-    # output_stream = StreamToFile("output.txt")
-    # # sys.stdout = output_stream
-    # # sys.stderr = output_stream
-    # try:
-    #     asyncio.run(
-    #         main(
-    #             objective="go to football page on bbc",
-    #             eval_mode=False,
-    #         )
-    #     )
-    # finally:
-    #     sys.stdout = sys.__stdout__
-    #     sys.stderr = sys.__stderr__
-    #     output_stream.close()
-    print(f"{GREEN}[DEBUG] Script finished{RESET}")
