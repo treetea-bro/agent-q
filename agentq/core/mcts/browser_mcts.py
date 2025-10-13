@@ -636,8 +636,6 @@ async def train_loop(
     critic = AgentQCritic(model_infer, tokenizer)
     vision = VisionAgent()  # 외부 API 기반이면 GPU 미사용
 
-    print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
-
     # ---- LoRA 어댑터 동기화 유틸 ----
     def sync_lora_adapters(src_peft_model, dst_peft_model):
         """
