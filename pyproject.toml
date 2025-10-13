@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10.13"
 dependencies = [
-    "agentops>=0.3.18",
+    # "agentops>=0.3.18",
     "aiohttp>=3.12.15",
     "bitsandbytes>=0.48.1",
     "boto3>=1.40.29",
