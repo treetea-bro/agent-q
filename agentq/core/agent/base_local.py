@@ -94,24 +94,28 @@ class BaseAgent:
             self.messages, tokenize=False, add_generation_prompt=True
         )
 
-        # === Tokenize & Generate ===
-        inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(self.model.device)
+        print("hihi", self.model.device)
+
+        inputs = self.tokenizer(
+            chat_prompt, return_tensors="pt", padding=True, truncation=True
+        ).to(self.model.device, non_blocking=True)
+
         input_length = inputs["input_ids"].shape[1]  # 기존 prompt 길이
 
-        with torch.no_grad():
+        with torch.inference_mode(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=1024,
                 do_sample=True,
                 temperature=0.3,
                 top_p=0.9,
+                use_cache=True,
             )
 
-        # === Decode only newly generated tokens ===
-        generated_tokens = outputs[0][input_length:]
-        decoded = self.tokenizer.decode(
-            generated_tokens, skip_special_tokens=True
-        ).strip()
+        generated_tokens = outputs[0][input_length:].to("cpu")
+        decoded = self.tokenizer.batch_decode(
+            [generated_tokens], skip_special_tokens=True
+        )[0]
 
         json_str = re.search(r"\{[\s\S]*\}", decoded)
 

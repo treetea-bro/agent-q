@@ -4,7 +4,13 @@ load_dotenv()
 
 import os
 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+os.environ["OMP_NUM_THREADS"] = "16"  # (CPU 코어 수에 맞게)
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+import torch
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
 
 import asyncio
 import json
@@ -13,7 +19,6 @@ import tempfile
 from typing import List, Tuple
 
 import numpy as np
-import torch
 from datasets import Dataset
 from langsmith import traceable
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
