@@ -600,7 +600,7 @@ def build_tokenizer(model_name: str):
 
 
 async def train_loop(
-    objective: str,
+    objectives: list[str],
     model_name: str,
     eval_mode: bool = False,
     num_iterations: int = 3,
@@ -638,16 +638,6 @@ async def train_loop(
 
     print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
 
-    browser_mcts_wrapper = BrowserMCTSWrapper(
-        objective=objective,
-        actor=actor,
-        critic=critic,
-        vision=vision,
-        n_iterations=10,
-        depth_limit=6,
-        exploration_weight=1.0,
-    )
-
     # ---- LoRA 어댑터 동기화 유틸 ----
     def sync_lora_adapters(src_peft_model, dst_peft_model):
         """
@@ -675,8 +665,17 @@ async def train_loop(
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     last_trainer = None
+    for i, objective in enumerate(objectives):
+        browser_mcts_wrapper = BrowserMCTSWrapper(
+            objective=objective,
+            actor=actor,
+            critic=critic,
+            vision=vision,
+            n_iterations=10,
+            depth_limit=6,
+            exploration_weight=1.0,
+        )
 
-    for i in range(num_iterations):
         print(f"\n========== LOOP {i + 1}/{num_iterations} ==========")
 
         # ---- 1) MCTS로 데이터 수집 (GPU1 / model_infer) ----
@@ -687,20 +686,21 @@ async def train_loop(
         BrowserMCTSWrapper.print_dpo_pairs(dpo_pairs=dpo_pairs)
         train_dataset = pairs_to_dataset(dpo_pairs)
 
-        # ---- 2) DPO 학습 (GPU0 / model_train) ----
         dpo_args = DPOConfig(
             output_dir=None,
             save_strategy="no",
             logging_strategy="steps",
             logging_steps=10,
-            num_train_epochs=1,
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
+            num_train_epochs=3,
+            per_device_train_batch_size=2,
+            gradient_accumulation_steps=2,
             gradient_checkpointing=True,
-            bf16=torch.cuda.is_available(),
-            fp16=not torch.cuda.is_available(),
-            beta=0.1,
+            bf16=True,
+            beta=0.3,
             optim="paged_adamw_8bit",
+            lr_scheduler_type="cosine",
+            learning_rate=2e-5,
+            warmup_ratio=0.05,
             remove_unused_columns=False,
             report_to=["none"],
         )
@@ -746,11 +746,17 @@ class StreamToFile:
         self.file.close()
 
 
+objectives = [
+    "Play the latest episode of Friends.",
+    "Play the most viewd pokemon movie",
+    "Play the most viewd movie in youtube",
+]
+
 if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     asyncio.run(
         train_loop(
-            objective="Play the latest episode of Friends.",
+            objectives=objectives,
             # model_name="openai/gpt-oss-20b",
             model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
             # model_name="Qwen/Qwen3-4B-Instruct-2507",
