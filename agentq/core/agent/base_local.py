@@ -53,7 +53,7 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    def _extract_json_from_output(text: str) -> Optional[dict]:
+    def _extract_json_from_output(self, text: str) -> Optional[dict]:
         """
         Removes reasoning (<think>...</think>) if present,
         then extracts the final JSON block from text.
