@@ -56,34 +56,46 @@ class BaseAgent:
 
     def _extract_json_from_output(self, text: str) -> Optional[dict]:
         """
-        - reasoning, 채널 토큰 등 제거
-        - 마지막 '{' 부터 끝까지 슬라이스
-        - JSONDecodeError 나면 None 반환
+        Robust JSON extractor:
+        - Cleans up system tokens (<think>, <|...|>, assistantfinal)
+        - Finds last '{' and parses till matching '}'
+        - If parsing fails, attempts truncated repair
         """
         cleaned = text.strip()
 
-        # 불필요한 시스템/메타 토큰 제거
+        # 1️⃣ Remove noisy tokens
         cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL)
         cleaned = re.sub(r"<\|.*?\|>", "", cleaned)
         cleaned = cleaned.replace("assistantfinal", "")
         cleaned = cleaned.replace("<|return|>", "")
         cleaned = cleaned.strip()
 
-        # 마지막 '{' 위치 찾기
+        # 2️⃣ Try to extract the last JSON object heuristically
         last_brace = cleaned.rfind("{")
         if last_brace == -1:
-            logger.error("❌ No '{' found in output.")
+            logger.error("❌ No '{' found in model output")
             return None
 
         candidate = cleaned[last_brace:]
+
+        # 3️⃣ First attempt — direct parse
         try:
-            parsed = json.loads(candidate)
-            return parsed
+            return json.loads(candidate)
         except json.JSONDecodeError as e:
-            logger.error(
-                f"❌ JSON parse error near end: {e}\n--- Raw tail ---\n{candidate[-500:]}"
-            )
-            return None
+            logger.warning(f"⚠️ Direct JSON parse failed: {e}. Attempting repair...")
+
+        # 4️⃣ Repair mode — truncate to last valid closing brace
+        closing_idx = candidate.rfind("}")
+        if closing_idx != -1:
+            try:
+                fixed = candidate[: closing_idx + 1]
+                return json.loads(fixed)
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ JSON parse failed after repair: {e}\n{fixed[-300:]}")
+                return None
+
+        logger.error("❌ No closing brace found for JSON")
+        return None
 
     # @traceable(run_type="chain", name="agent_run")
     async def run(
