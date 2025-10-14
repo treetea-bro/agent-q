@@ -107,7 +107,7 @@ class BaseAgent:
                 }
             )
 
-        # === Build chat prompt ===
+        print("inputs!")
         inputs = self.tokenizer.apply_chat_template(
             self.messages,
             add_generation_prompt=True,
@@ -115,14 +115,18 @@ class BaseAgent:
             return_dict=True,
             reasoning_effort="low",
         ).to(self.model.device)
+        print("inputs!")
 
+        print("outputs!")
         outputs = self.model.generate(
             **inputs,
             max_new_tokens=1024,
-            do_sample=True,
         )
+        print("outputs!")
 
+        print("gento!")
         generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
+        print("gento!")
         decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         print("decoded", "-" * 50)
