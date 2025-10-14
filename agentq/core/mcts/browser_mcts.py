@@ -940,7 +940,7 @@ if __name__ == "__main__":
         train_loop_unsloth(
             objectives,
             # "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
-            "unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit",
+            "unsloth/Qwen3-32B-unsloth-bnb-4bit",
             # model_name="Qwen/Qwen3-30B-A3B-Instruct",
         )
     )
