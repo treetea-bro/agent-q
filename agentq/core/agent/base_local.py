@@ -56,49 +56,34 @@ class BaseAgent:
 
     def _extract_json_from_output(self, text: str) -> Optional[dict]:
         """
-        Extracts the most likely JSON object from model output.
-        Handles:
-          - reasoning sections (<think>...</think>)
-          - noisy prefixes (like assistantfinal, <|channel|>, etc.)
-          - truncated or extra tokens before/after JSON
-          - nested braces and incomplete endings
+        - reasoning, 채널 토큰 등 제거
+        - 마지막 '{' 부터 끝까지 슬라이스
+        - JSONDecodeError 나면 None 반환
         """
+        cleaned = text.strip()
 
-        # 1️⃣ Remove reasoning or hidden commentary
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-        cleaned = re.sub(r"<\|.*?\|>", "", cleaned, flags=re.DOTALL)
+        # 불필요한 시스템/메타 토큰 제거
+        cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"<\|.*?\|>", "", cleaned)
         cleaned = cleaned.replace("assistantfinal", "")
+        cleaned = cleaned.replace("<|return|>", "")
         cleaned = cleaned.strip()
 
-        # 2️⃣ Find *all* JSON-like objects and pick the longest valid one
-        json_candidates = re.findall(r"\{[\s\S]*?\}", cleaned)
-        if not json_candidates:
-            logger.error("❌ No JSON pattern found in text.")
+        # 마지막 '{' 위치 찾기
+        last_brace = cleaned.rfind("{")
+        if last_brace == -1:
+            logger.error("❌ No '{' found in output.")
             return None
 
-        best_json = None
-        for candidate in reversed(json_candidates):  # reversed → prioritize last JSON
-            try:
-                parsed = json.loads(candidate)
-                best_json = parsed
-                break
-            except json.JSONDecodeError:
-                continue
-
-        # 3️⃣ If none parsed cleanly, try partial repair (truncate at last '}')
-        if not best_json:
-            last_brace = cleaned.rfind("}")
-            if last_brace != -1:
-                try:
-                    best_json = json.loads(cleaned[: last_brace + 1])
-                except json.JSONDecodeError as e:
-                    logger.error(f"JSON parse failed even after repair: {e}")
-                    return None
-            else:
-                logger.error("❌ No closing brace found at all.")
-                return None
-
-        return best_json
+        candidate = cleaned[last_brace:]
+        try:
+            parsed = json.loads(candidate)
+            return parsed
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"❌ JSON parse error near end: {e}\n--- Raw tail ---\n{candidate[-500:]}"
+            )
+            return None
 
     # @traceable(run_type="chain", name="agent_run")
     async def run(
