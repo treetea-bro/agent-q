@@ -91,7 +91,6 @@ class BaseAgent:
         # === Build chat prompt ===
         inputs = self.tokenizer.apply_chat_template(
             self.messages,
-            tokenize=False,
             add_generation_prompt=True,
             return_tensors="pt",
             return_dict=True,
