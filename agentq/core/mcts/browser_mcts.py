@@ -2,37 +2,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
-import os
-
-import torch
-from datasets import Dataset
-from transformers import TrainingArguments
-from trl import DPOTrainer
-
-from agentq.core.agent.agentq_actor import AgentQActor
-from agentq.core.agent.agentq_critic import AgentQCritic
-from agentq.core.agent.vision_agent import VisionAgent
-from agentq.core.mcts.browser_mcts import BrowserMCTSWrapper, pairs_to_dataset
-from agentq.core.web_driver.playwright import PlaywrightManager
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["OMP_NUM_THREADS"] = "4"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
-
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.benchmark = False
-
-
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.benchmark = True
-
+# os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# os.environ["OMP_NUM_THREADS"] = "4"
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
+#
+# torch.backends.cuda.matmul.allow_tf32 = False
+# torch.backends.cudnn.benchmark = False
 import asyncio
 import json
+import os
 import shutil
 import tempfile
 from typing import List, Tuple
 
 import numpy as np
+import torch
+from datasets import Dataset
 from langsmith import traceable
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from playwright.async_api import Page
@@ -41,11 +26,16 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    TrainingArguments,
 )
+from trl import DPOTrainer
 from trl.trainer.dpo_config import DPOConfig
 from trl.trainer.dpo_trainer import DPOTrainer
 
+from agentq.core.agent.agentq_actor import AgentQActor
+from agentq.core.agent.agentq_critic import AgentQCritic
 from agentq.core.agent.base import BaseAgent
+from agentq.core.agent.vision_agent import VisionAgent
 from agentq.core.mcts.core.base import Reasoner, SearchConfig, WorldModel
 from agentq.core.mcts.core.mcts import MCTS, MCTSResult
 from agentq.core.models.models import (
@@ -70,6 +60,7 @@ from agentq.core.skills.get_dom_with_content_type import get_dom_with_content_ty
 from agentq.core.skills.get_screenshot import get_screenshot
 from agentq.core.skills.get_url import geturl
 from agentq.core.skills.open_url import openurl
+from agentq.core.web_driver.playwright import PlaywrightManager
 
 # ANSI color codes
 BLUE = "\033[94m"
