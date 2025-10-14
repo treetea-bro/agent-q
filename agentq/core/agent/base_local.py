@@ -100,7 +100,7 @@ class BaseAgent:
 
         input_length = inputs["input_ids"].shape[1]  # 기존 prompt 길이
 
-        with torch.inference_mode(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.inference_mode():
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=1024,
