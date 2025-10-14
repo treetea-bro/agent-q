@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from typing import Callable, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
@@ -114,7 +115,6 @@ class BaseAgent:
                 }
             )
 
-        print("inputs!")
         inputs = self.tokenizer.apply_chat_template(
             self.messages,
             add_generation_prompt=True,
@@ -122,19 +122,18 @@ class BaseAgent:
             return_dict=True,
             reasoning_effort="low",
         ).to(self.model.device)
-        print("inputs!")
 
-        print("outputs!")
+        st = time.time()
+
+        print("outputs start", st)
         outputs = self.model.fast_generate(
             **inputs,
             max_new_tokens=1024,
         )
-        print("outputs!")
+        print("outputs end", st - time.time())
 
-        print("gento!")
         generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
-        print("gento!")
-        decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
 
         print("decoded", "-" * 50)
         print(decoded)
