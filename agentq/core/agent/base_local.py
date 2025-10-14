@@ -2,7 +2,6 @@ import json
 import re
 from typing import Callable, List, Optional, Tuple, Type
 
-import torch
 from langsmith import traceable
 from pydantic import BaseModel
 
@@ -90,30 +89,26 @@ class BaseAgent:
             )
 
         # === Build chat prompt ===
-        chat_prompt = self.tokenizer.apply_chat_template(
-            self.messages, tokenize=False, add_generation_prompt=True
+        inputs = self.tokenizer.apply_chat_template(
+            self.messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
+            reasoning_effort="low",
+        ).to(self.model.device)
+
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=1024,
+            do_sample=True,
+            temperature=0.3,
+            top_p=0.9,
+            use_cache=True,
         )
 
-        inputs = self.tokenizer(
-            chat_prompt, return_tensors="pt", padding=True, truncation=True
-        ).to(self.model.device, non_blocking=True)
-
-        input_length = inputs["input_ids"].shape[1]  # 기존 prompt 길이
-
-        with torch.inference_mode():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=1024,
-                do_sample=True,
-                temperature=0.3,
-                top_p=0.9,
-                use_cache=True,
-            )
-
-        generated_tokens = outputs[0][input_length:]
-        decoded = self.tokenizer.batch_decode(
-            [generated_tokens], skip_special_tokens=True
-        )[0]
+        generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
+        decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         print("decoded", "-" * 50)
         print(decoded)

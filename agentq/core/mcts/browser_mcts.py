@@ -794,16 +794,16 @@ def build_unsloth_policy(model_name: str, max_seq_len: int = 2048):
         dtype=None,  # Auto: bf16 / fp16
         # device_map="auto",
         device_map={"": 1},
-        use_gradient_checkpointing=True,
     )
 
     # LoRA 어댑터 설정
     model = FastLanguageModel.get_peft_model(
         model,
-        r=16,
-        lora_alpha=32,
-        lora_dropout=0.05,
+        r=8,
+        lora_alpha=16,
+        lora_dropout=0,
         bias="none",
+        use_gradient_checkpointing="unsloth",
         target_modules=[
             "q_proj",
             "k_proj",
