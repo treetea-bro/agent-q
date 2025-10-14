@@ -110,17 +110,21 @@ class BaseAgent:
                 use_cache=True,
             )
 
-        generated_tokens = outputs[0][input_length:].to("cpu")
+        generated_tokens = outputs[0][input_length:]
         decoded = self.tokenizer.batch_decode(
             [generated_tokens], skip_special_tokens=True
         )[0]
 
+        print("decoded", "-" * 50)
+        print(decoded)
+        print("-" * 50)
+
         json_str = re.search(r"\{[\s\S]*\}", decoded)
 
-        del decoded
-        del generated_tokens
-        del outputs
-        del inputs
+        # del decoded
+        # del generated_tokens
+        # del outputs
+        # del inputs
 
         if json_str:
             parsed = json.loads(json_str.group())
