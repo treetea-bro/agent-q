@@ -1,8 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
-from unsloth.trl import DPOTrainer  # isort: skip  # noqa: E402
+from unsloth import FastLanguageModel, DPOTrainer  # isort: skip  # noqa: E402
 import os
 
 import torch
