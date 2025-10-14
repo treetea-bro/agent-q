@@ -792,8 +792,8 @@ def build_unsloth_policy(model_name: str, max_seq_len: int = 4096):
         max_seq_length=max_seq_len,
         load_in_4bit=True,  # NF4 quantization
         dtype=None,  # Auto: bf16 / fp16
-        device_map="auto",
-        # device_map={"": 1},
+        # device_map="auto",
+        device_map={"": 0},
     )
 
     # LoRA 어댑터 설정
@@ -940,7 +940,8 @@ if __name__ == "__main__":
         train_loop_unsloth(
             objectives,
             # "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
-            "unsloth/Qwen3-32B-unsloth-bnb-4bit",
+            "unsloth/Qwen3-14B-unsloth-bnb-4bit",
+            # "unsloth/Qwen3-32B-unsloth-bnb-4bit",
             # model_name="Qwen/Qwen3-30B-A3B-Instruct",
         )
     )
