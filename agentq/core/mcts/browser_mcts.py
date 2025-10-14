@@ -792,8 +792,8 @@ def build_unsloth_policy(model_name: str, max_seq_len: int = 4096):
         max_seq_length=max_seq_len,
         load_in_4bit=True,  # NF4 quantization
         dtype=None,  # Auto: bf16 / fp16
-        # device_map="auto",
-        device_map={"": 1},
+        device_map="auto",
+        # device_map={"": 1},
     )
 
     # LoRA 어댑터 설정
