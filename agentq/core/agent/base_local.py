@@ -1,6 +1,6 @@
 import json
 import re
-import time
+from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
@@ -56,30 +56,49 @@ class BaseAgent:
 
     def _extract_json_from_output(self, text: str) -> Optional[dict]:
         """
-        Removes reasoning (<think>...</think>) if present,
-        then extracts the final JSON block from text.
+        Extracts the most likely JSON object from model output.
+        Handles:
+          - reasoning sections (<think>...</think>)
+          - noisy prefixes (like assistantfinal, <|channel|>, etc.)
+          - truncated or extra tokens before/after JSON
+          - nested braces and incomplete endings
         """
 
-        # 1️⃣ Remove reasoning sections (if exist)
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        # 1️⃣ Remove reasoning or hidden commentary
+        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        cleaned = re.sub(r"<\|.*?\|>", "", cleaned, flags=re.DOTALL)
+        cleaned = cleaned.replace("assistantfinal", "")
+        cleaned = cleaned.strip()
 
-        # 2️⃣ Capture the *last JSON-like* block even if prefixed by other tokens (e.g. "assistantfinal")
-        json_match = re.search(r"\{[\s\S]*\}\s*$", cleaned)
-        if not json_match:
-            # Try more permissive pattern in case assistantfinal is present
-            json_match = re.search(r"assistantfinal\s*(\{[\s\S]*\})", cleaned)
-            if not json_match:
-                logger.error("No JSON found in model output")
+        # 2️⃣ Find *all* JSON-like objects and pick the longest valid one
+        json_candidates = re.findall(r"\{[\s\S]*?\}", cleaned)
+        if not json_candidates:
+            logger.error("❌ No JSON pattern found in text.")
+            return None
+
+        best_json = None
+        for candidate in reversed(json_candidates):  # reversed → prioritize last JSON
+            try:
+                parsed = json.loads(candidate)
+                best_json = parsed
+                break
+            except json.JSONDecodeError:
+                continue
+
+        # 3️⃣ If none parsed cleanly, try partial repair (truncate at last '}')
+        if not best_json:
+            last_brace = cleaned.rfind("}")
+            if last_brace != -1:
+                try:
+                    best_json = json.loads(cleaned[: last_brace + 1])
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON parse failed even after repair: {e}")
+                    return None
+            else:
+                logger.error("❌ No closing brace found at all.")
                 return None
 
-        # 3️⃣ Extract group 1 if matched with prefix
-        group = json_match.group(1) if json_match.lastindex else json_match.group(0)
-
-        try:
-            return json.loads(group)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {e}\nText:\n{group}")
-            return None
+        return best_json
 
     # @traceable(run_type="chain", name="agent_run")
     async def run(
@@ -123,14 +142,16 @@ class BaseAgent:
             reasoning_effort="low",
         ).to(self.model.device)
 
-        st = time.time()
+        start_time = datetime.now()
+        print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        print("outputs start", st)
         outputs = self.model.fast_generate(
             **inputs,
-            max_new_tokens=1024,
+            max_new_tokens=2048,
         )
-        print("outputs end", st - time.time())
+        end_time = datetime.now()
+        print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
 
         generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
         decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)

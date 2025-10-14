@@ -784,7 +784,7 @@ class StreamToFile:
 #     print(f"{GREEN}[DEBUG] Script finished{RESET}")
 
 
-def build_unsloth_policy(model_name: str, max_seq_len: int = 2048):
+def build_unsloth_policy(model_name: str, max_seq_len: int = 4096):
     print(f"{YELLOW}[INFO] Loading {model_name} via Unsloth (QLoRA 4-bit){RESET}")
 
     model, tokenizer = FastLanguageModel.from_pretrained(
