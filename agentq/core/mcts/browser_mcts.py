@@ -1,12 +1,13 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-from unsloth import FastLanguageModel, DPOTrainer  # isort: skip  # noqa: E402
+from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
 import os
 
 import torch
 from datasets import Dataset
 from transformers import TrainingArguments
+from trl import DPOTrainer
 
 from agentq.core.agent.agentq_actor import AgentQActor
 from agentq.core.agent.agentq_critic import AgentQCritic
