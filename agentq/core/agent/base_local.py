@@ -54,24 +54,31 @@ class BaseAgent:
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
     def _extract_json_from_output(self, text: str) -> Optional[dict]:
-        """
-        Removes reasoning (<think>...</think>) if present,
-        then extracts the final JSON block from text.
-        """
-        # 1️⃣ Remove reasoning sections (if exist)
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    """
+    Removes reasoning (<think>...</think>) if present,
+    then extracts the final JSON block from text.
+    """
+    # 1️⃣ Remove reasoning sections (if exist)
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
-        # 2️⃣ Try to locate JSON (last JSON block is usually the final answer)
-        json_match = re.search(r"\{[\s\S]*\}", cleaned)
+    # 2️⃣ Capture the *last JSON-like* block even if prefixed by other tokens (e.g. "assistantfinal")
+    json_match = re.search(r"\{[\s\S]*\}\s*$", cleaned)
+    if not json_match:
+        # Try more permissive pattern in case assistantfinal is present
+        json_match = re.search(r"assistantfinal\s*(\{[\s\S]*\})", cleaned)
         if not json_match:
+            logger.error("No JSON found in model output")
             return None
 
-        # 3️⃣ Parse JSON safely
-        try:
-            return json.loads(json_match.group())
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {e}")
-            return None
+    # 3️⃣ Extract group 1 if matched with prefix
+    group = json_match.group(1) if json_match.lastindex else json_match.group(0)
+
+    try:
+        return json.loads(group)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error: {e}\nText:\n{group}")
+        return None
+
 
     # @traceable(run_type="chain", name="agent_run")
     async def run(
