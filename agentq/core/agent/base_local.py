@@ -2,7 +2,6 @@ import json
 import re
 from typing import Callable, List, Optional, Tuple, Type
 
-from langsmith import traceable
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
@@ -54,7 +53,27 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    @traceable(run_type="chain", name="agent_run")
+    def _extract_json_from_output(text: str) -> Optional[dict]:
+        """
+        Removes reasoning (<think>...</think>) if present,
+        then extracts the final JSON block from text.
+        """
+        # 1️⃣ Remove reasoning sections (if exist)
+        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+        # 2️⃣ Try to locate JSON (last JSON block is usually the final answer)
+        json_match = re.search(r"\{[\s\S]*\}", cleaned)
+        if not json_match:
+            return None
+
+        # 3️⃣ Parse JSON safely
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse error: {e}")
+            return None
+
+    # @traceable(run_type="chain", name="agent_run")
     async def run(
         self,
         input_data: BaseModel,
@@ -101,9 +120,6 @@ class BaseAgent:
             **inputs,
             max_new_tokens=1024,
             do_sample=True,
-            temperature=0.3,
-            top_p=0.9,
-            use_cache=True,
         )
 
         generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
@@ -113,18 +129,15 @@ class BaseAgent:
         print(decoded)
         print("-" * 50)
 
-        json_str = re.search(r"\{[\s\S]*\}", decoded)
-
         # del decoded
         # del generated_tokens
         # del outputs
         # del inputs
 
-        if json_str:
-            parsed = json.loads(json_str.group())
-            print("parsed", "-" * 50)
-            print(parsed)
-            print("-" * 50)
+        parsed = self._extract_json_from_output(decoded)
+        print("parsed", "-" * 50)
+        print(parsed)
+        print("-" * 50)
 
         # === Parse and validate ===
         return self.output_format.model_validate(parsed)
