@@ -936,7 +936,8 @@ if __name__ == "__main__":
     ]
     asyncio.run(
         train_loop_unsloth(
-            objectives=objectives,
-            model_name="Qwen/Qwen3-30B-A3B-Instruct",
+            objectives,
+            "unsloth/gpt-oss-20b-unsloth-bnb-4bit"
+            # model_name="Qwen/Qwen3-30B-A3B-Instruct",
         )
     )
