@@ -94,8 +94,6 @@ class BaseAgent:
             self.messages, tokenize=False, add_generation_prompt=True
         )
 
-        print("hihi", self.model.device)
-
         inputs = self.tokenizer(
             chat_prompt, return_tensors="pt", padding=True, truncation=True
         ).to(self.model.device, non_blocking=True)

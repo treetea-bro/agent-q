@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
+
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # os.environ["OMP_NUM_THREADS"] = "4"
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
@@ -791,7 +792,8 @@ def build_unsloth_policy(model_name: str, max_seq_len: int = 2048):
         max_seq_length=max_seq_len,
         load_in_4bit=True,  # NF4 quantization
         dtype=None,  # Auto: bf16 / fp16
-        device_map="auto",
+        # device_map="auto",
+        device_map={"": 1},
         use_gradient_checkpointing=True,
     )
 
@@ -937,7 +939,7 @@ if __name__ == "__main__":
     asyncio.run(
         train_loop_unsloth(
             objectives,
-            "unsloth/gpt-oss-20b-unsloth-bnb-4bit"
+            "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
             # model_name="Qwen/Qwen3-30B-A3B-Instruct",
         )
     )
