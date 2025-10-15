@@ -750,40 +750,6 @@ class StreamToFile:
         self.file.close()
 
 
-# objectives = [
-#     "Play the latest episode of Friends.",
-#     "Play the most viewd pokemon movie",
-#     "Play the most viewd movie in youtube",
-# ]
-
-# if __name__ == "__main__":
-#     print(f"{BLUE}[DEBUG] Script started{RESET}")
-#     asyncio.run(
-#         train_loop(
-#             objectives=objectives,
-#             # model_name="openai/gpt-oss-20b",
-#             model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-#             # model_name="Qwen/Qwen3-4B-Instruct-2507",
-#             # model_name="Qwen/Qwen2.5-14B-Instruct",
-#         )
-#     )
-#     # output_stream = StreamToFile("output.txt")
-#     # # sys.stdout = output_stream
-#     # # sys.stderr = output_stream
-#     # try:
-#     #     asyncio.run(
-#     #         main(
-#     #             objective="go to football page on bbc",
-#     #             eval_mode=False,
-#     #         )
-#     #     )
-#     # finally:
-#     #     sys.stdout = sys.__stdout__
-#     #     sys.stderr = sys.__stderr__
-#     #     output_stream.close()
-#     print(f"{GREEN}[DEBUG] Script finished{RESET}")
-
-
 def build_unsloth_policy(model_name: str, max_seq_len: int = 4096):
     print(f"{YELLOW}[INFO] Loading {model_name} via Unsloth (QLoRA 4-bit){RESET}")
 
@@ -925,23 +891,32 @@ async def train_loop_unsloth(
         print(f"✅ 최종 LoRA 어댑터 포함 모델 저장 → {output_dir}")
 
 
-# =====================
-# Entry
-# =====================
 if __name__ == "__main__":
-    import asyncio
-
     objectives = [
         "Play the latest episode of Friends.",
         "Play the most viewed Pokemon movie.",
         "Play the most viewed movie on YouTube.",
     ]
-    asyncio.run(
-        train_loop_unsloth(
-            objectives,
-            "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
-            # "unsloth/Qwen3-14B-unsloth-bnb-4bit",
-            # "unsloth/Qwen3-32B-unsloth-bnb-4bit",
-            # model_name="Qwen/Qwen3-30B-A3B-Instruct",
+    provider = "hf"
+    print(f"{BLUE}[DEBUG] Script started{RESET}")
+    if provider == "hf":
+        asyncio.run(
+            train_loop(
+                objectives=objectives,
+                # model_name="openai/gpt-oss-20b",
+                model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+                # model_name="Qwen/Qwen3-4B-Instruct-2507",
+                # model_name="Qwen/Qwen2.5-14B-Instruct",
+            )
         )
-    )
+    elif provider == "unsloth":
+        asyncio.run(
+            train_loop_unsloth(
+                objectives,
+                "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+                # "unsloth/Qwen3-14B-unsloth-bnb-4bit",
+                # "unsloth/Qwen3-32B-unsloth-bnb-4bit",
+                # model_name="Qwen/Qwen3-30B-A3B-Instruct",
+            )
+        )
+    print(f"{GREEN}[DEBUG] Script finished{RESET}")

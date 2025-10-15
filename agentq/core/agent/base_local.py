@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
+from jsonformer import Jsonformer
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
@@ -194,10 +195,12 @@ class BaseAgent:
         start_time = datetime.now()
         print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        outputs = self.model.fast_generate(
-            **inputs,
-            max_new_tokens=2048,
-        )
+        json_schema = self.output_format.model_json_shema()
+        Jsonformer(self.model, self.tokenizer, json_schema, inputs)
+        outputs = Jsonformer()
+        print("outputs", "-" * 50)
+        print(outputs)
+        print("-" * 50)
         end_time = datetime.now()
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
