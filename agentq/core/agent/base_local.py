@@ -213,25 +213,13 @@ class BaseAgent:
         print(outputs)
         print("-" * 50)
 
-        generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
-        decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-
-        print("decoded", "-" * 50)
-        print(decoded)
-        print("-" * 50)
-
         # del decoded
         # del generated_tokens
         # del outputs
         # del inputs
 
-        parsed = self._extract_json_from_output(decoded)
-        print("parsed", "-" * 50)
-        print(parsed)
-        print("-" * 50)
-
         # === Parse and validate ===
-        return self.output_format.model_validate(parsed)
+        return self.output_format.model_validate(outputs)
 
     # async def run(
     #     self,
