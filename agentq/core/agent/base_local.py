@@ -186,7 +186,10 @@ class BaseAgent:
         inputs = self.tokenizer.apply_chat_template(
             self.messages,
             add_generation_prompt=True,
+            tokenize=False,
             return_tensors=None,
+            # return_dict=True,
+            # reasoning_effort="low",
         )
 
         print("inputs", "-" * 50)
