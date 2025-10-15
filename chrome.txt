@@ -17,20 +17,30 @@ google-chrome --version
 
 2. Headless 모드 + 디버그 포트로 실행
 google-chrome \
+  --remote-debugging-port=9222 \
   --headless=new \
   --disable-gpu \
-  --remote-debugging-port=9222 \
-  "--remote-allow-origins=*" \
+  --enable-unsafe-swiftshader \
+  --use-gl=swiftshader \
   --no-sandbox \
+  --disable-dev-shm-usage \
+  --disable-software-rasterizer \
+  --remote-allow-origins="*" \
+  --user-data-dir=/tmp/playwright-profile \
   about:blank
 
 3. No Headless 모드 + 디버그 포트로 실행
 google-chrome \
-  --disable-gpu \
   --remote-debugging-port=9222 \
-  "--remote-allow-origins=*" \
+  --disable-gpu \
+  --enable-unsafe-swiftshader \
+  --use-gl=swiftshader \
   --no-sandbox \
- --user-data-dir=/tmp about:blank
+  --disable-dev-shm-usage \
+  --disable-software-rasterizer \
+  --remote-allow-origins="*" \
+  --user-data-dir=/tmp/playwright-profile \
+  about:blank
 
 4. 디버그 포트 확인
 curl http://localhost:9222/json/version
