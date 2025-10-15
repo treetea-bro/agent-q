@@ -89,6 +89,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         playwright_manager = PlaywrightManager()
         await playwright_manager.go_to_homepage()
 
+        await wait_for_navigation()
         # initialzie dom and url
         initial_dom = await self.get_current_dom()
         initial_url = await self.get_current_url()
