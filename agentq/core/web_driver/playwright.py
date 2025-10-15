@@ -216,7 +216,6 @@ class PlaywrightManager:
             Page: The current page if any.
         """
         print("get_current_page", "-" * 50)
-        print(get_current_page)
         print("-" * 50)
         browser: BrowserContext = await self.get_browser_context()  # type: ignore
         # Filter out closed pages
