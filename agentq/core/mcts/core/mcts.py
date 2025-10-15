@@ -230,7 +230,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             await self._expand(path[-1])
             await self._simulate(path)
         cum_reward = self._back_propagate(path)
-        #self._print_tree(self.root)
+        # self._print_tree(self.root)
         if (
             self.output_strategy == "max_iter"
             and path[-1].is_terminal
@@ -402,7 +402,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             print(f"-----iter: {iter}----")
             # start with home page for each iteration
             playwright_manager = PlaywrightManager()
-            await playwright_manager.go_to_homepage()
+            # await playwright_manager.go_to_homepage()
             path = await self.iterate(self.root)
             if self.output_trace_in_each_iter:
                 self.trace_in_each_iter.append(deepcopy(path))
