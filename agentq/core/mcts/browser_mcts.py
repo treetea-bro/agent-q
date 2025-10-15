@@ -907,8 +907,8 @@ if __name__ == "__main__":
                 objectives=objectives,
                 # model_name="openai/gpt-oss-20b",
                 # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-                # model_name="Qwen/Qwen3-4B-Instruct-2507",
-                model_name="Qwen/Qwen2.5-14B-Instruct",
+                model_name="Qwen/Qwen3-4B-Instruct-2507",
+                # model_name="Qwen/Qwen2.5-14B-Instruct",
             )
         )
     elif provider == "unsloth":
