@@ -20,7 +20,6 @@ import numpy as np
 import outlines
 import torch
 from datasets import Dataset
-from langsmith import traceable
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from playwright.async_api import Page
 from transformers import (
@@ -74,7 +73,7 @@ CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
-@traceable(run_type="chain", name="mcts")
+# @traceable(run_type="chain", name="mcts")
 class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
     def __init__(self, objective: str, vision: BaseAgent) -> None:
         super().__init__()

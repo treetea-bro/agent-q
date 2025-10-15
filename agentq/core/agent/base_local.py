@@ -1,5 +1,4 @@
 import json
-import re
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
@@ -53,101 +52,6 @@ class BaseAgent:
 
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
-
-    def _extract_json_from_output(self, text: str) -> Optional[dict]:
-        """
-        1) 마지막 <|channel|>final<|message|> 블록만 스코프
-        2) 그 블록 안에서 첫 '{'부터 '문자열/이스케이프를 고려'한 중괄호 매칭으로 끝 '}' 위치 찾기
-        3) 해당 구간만 json.loads
-        """
-        if not text:
-            logger.error("❌ Empty text.")
-            return None
-
-        raw = text
-
-        # 1) 최종 final 블록만 스코프: 마지막 <|channel|>final<|message|> 기준으로 자르기
-        FINAL_TAG = "<|channel|>final<|message|>"
-        idx = raw.rfind(FINAL_TAG)
-        if idx != -1:
-            scoped = raw[idx + len(FINAL_TAG) :]
-        else:
-            # fallback: 그래도 못 찾으면 전체에서 시도 (하지만 권장하지 않음)
-            scoped = raw
-
-        # 2) <|return|> 있으면 거기까지 자르기 (뒤 꼬리 정리)
-        end_tag = "<|return|>"
-        end_idx = scoped.find(end_tag)
-        if end_idx != -1:
-            scoped = scoped[:end_idx]
-
-        # 3) 채널 토큰 제거: 토큰만 제거 (내용은 남김)
-        #    *여기에서 .*? 는 토큰 단위만 제거, DOTALL 금지로 라인 넘어 매치 방지
-        scoped = re.sub(r"<\|[^|]*?\|>", "", scoped)
-        scoped = scoped.replace("assistantfinal", "")
-        scoped = re.sub(r"<think>.*?</think>", "", scoped, flags=re.DOTALL)
-        scoped = scoped.strip()
-
-        # 4) 스코프 내에서 첫 '{' 위치
-        start = scoped.find("{")
-        if start == -1:
-            logger.error("❌ No '{' found in final block.")
-            return None
-
-        # 5) 문자열/이스케이프 인지하는 중괄호 매칭으로 종료 '}' 찾기
-        i = start
-        depth = 0
-        in_str = False
-        esc = False
-        end = -1
-        while i < len(scoped):
-            ch = scoped[i]
-
-            if in_str:
-                if esc:
-                    esc = False
-                elif ch == "\\":
-                    esc = True
-                elif ch == '"':
-                    in_str = False
-            else:
-                if ch == '"':
-                    in_str = True
-                elif ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        end = i
-                        break
-            i += 1
-
-        if end == -1:
-            logger.error(
-                "❌ Could not find matching closing '}' for JSON in final block."
-            )
-            # 그래도 마지막 '}' 까지 잘라서 한 번 시도
-            last_brace = scoped.rfind("}")
-            if last_brace != -1:
-                candidate = scoped[start : last_brace + 1]
-                try:
-                    return json.loads(candidate)
-                except json.JSONDecodeError as e:
-                    logger.error(
-                        f"❌ Fallback parse failed: {e}\n--- tail ---\n{candidate[-400:]}"
-                    )
-                    return None
-            return None
-
-        candidate = scoped[start : end + 1]
-
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError as e:
-            logger.error(
-                f"❌ JSON parse error: {e}\n--- scoped head ---\n{scoped[:200]}\n--- candidate tail ---\n{candidate[-400:]}"
-            )
-            return None
 
     # @traceable(run_type="chain", name="agent_run")
     async def run(
@@ -205,10 +109,6 @@ class BaseAgent:
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
 
-        print("outputs", "-" * 50)
-        print(outputs)
-        print("-" * 50)
-
         # ✅ 안전하게 문자열/딕셔너리 자동 구분
         parsed = None
         if isinstance(outputs, str):
@@ -233,10 +133,6 @@ class BaseAgent:
         except Exception as e:
             logger.error(f"❌ Validation failed for model output: {e}")
             raise
-        # del decoded
-        # del generated_tokens
-        # del outputs
-        # del inputs
 
         print("parsed", "-" * 50)
         print(parsed)
