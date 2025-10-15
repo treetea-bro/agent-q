@@ -177,6 +177,9 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
     async def get_current_dom(self) -> str:
         await wait_for_navigation()
         dom = await get_dom_with_content_type(content_type="all_fields")
+        print("dom", "-" * 40)
+        print(dom)
+        print("-" * 40)
         print(f"{CYAN}[DEBUG] Got current DOM (length: {len(dom)}){RESET}")
         return str(dom)[:4000]
 
