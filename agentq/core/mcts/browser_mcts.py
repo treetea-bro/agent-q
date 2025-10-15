@@ -174,8 +174,8 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         print(f"{GREEN}[DEBUG] After action execution - New URL: {new_url}{RESET}")
         return new_dom, new_url
 
-    async def wait_for_dom_stable(
-        page: Page, timeout: int = 8000, check_interval: int = 500
+    async def _wait_for_dom_stable(
+        self, page: Page, timeout: int = 8000, check_interval: int = 500
     ):
         """
         일정 시간 동안 DOM이 변하지 않으면 안정되었다고 판단.
@@ -214,7 +214,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         await page.wait_for_load_state("networkidle", timeout=15000)
 
         print(f"{YELLOW}[DEBUG] Checking for stable DOM...{RESET}")
-        await wait_for_dom_stable(page, timeout=8000, check_interval=500)
+        await self._wait_for_dom_stable(page, timeout=8000, check_interval=500)
 
         # 안정 버퍼 — JS hydration 이후 약간의 여유를 줌
         await asyncio.sleep(1.0)
