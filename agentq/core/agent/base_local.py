@@ -3,7 +3,6 @@ import re
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
-from jsonformer import Jsonformer
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
@@ -192,18 +191,26 @@ class BaseAgent:
             reasoning_effort="low",
         ).to(self.model.device)
 
+        print("inputs", "-" * 50)
+        print(inputs)
+        print("-" * 50)
+        print(type(inputs))
+        print("-" * 50)
         start_time = datetime.now()
         print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        json_schema = self.output_format.model_json_shema()
-        Jsonformer(self.model, self.tokenizer, json_schema, inputs)
-        outputs = Jsonformer()
-        print("outputs", "-" * 50)
-        print(outputs)
-        print("-" * 50)
+        outputs = self.model(
+            inputs,
+            self.output_format,
+            max_new_tokens=2048,
+        )
         end_time = datetime.now()
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
+
+        print("outputs", "-" * 50)
+        print(outputs)
+        print("-" * 50)
 
         generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
         decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
@@ -224,6 +231,78 @@ class BaseAgent:
 
         # === Parse and validate ===
         return self.output_format.model_validate(parsed)
+
+    # async def run(
+    #     self,
+    #     input_data: BaseModel,
+    #     screenshot: str | None = None,
+    #     session_id: str | None = None,
+    # ) -> BaseModel:
+    #     if not isinstance(input_data, self.input_format):
+    #         raise ValueError(f"Input data must be of type {self.input_format.__name__}")
+    #
+    #     # Reset messages if history not kept
+    #     if not self.keep_message_history:
+    #         self._initialize_messages()
+    #
+    #     self.messages.append(
+    #         {
+    #             "role": "user",
+    #             "content": input_data.model_dump_json(
+    #                 exclude={"current_page_dom", "current_page_url"}
+    #             ),
+    #         }
+    #     )
+    #
+    #     # Add DOM context if present
+    #     if hasattr(input_data, "current_page_dom") and hasattr(
+    #         input_data, "current_page_url"
+    #     ):
+    #         self.messages.append(
+    #             {
+    #                 "role": "user",
+    #                 "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
+    #             }
+    #         )
+    #
+    #     inputs = self.tokenizer.apply_chat_template(
+    #         self.messages,
+    #         add_generation_prompt=True,
+    #         return_tensors="pt",
+    #         return_dict=True,
+    #         reasoning_effort="low",
+    #     ).to(self.model.device)
+    #
+    #     start_time = datetime.now()
+    #     print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    #
+    #     outputs = self.model.fast_generate(
+    #         **inputs,
+    #         max_new_tokens=2048,
+    #     )
+    #     end_time = datetime.now()
+    #     print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    #     print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
+    #
+    #     generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
+    #     decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
+    #
+    #     print("decoded", "-" * 50)
+    #     print(decoded)
+    #     print("-" * 50)
+    #
+    #     # del decoded
+    #     # del generated_tokens
+    #     # del outputs
+    #     # del inputs
+    #
+    #     parsed = self._extract_json_from_output(decoded)
+    #     print("parsed", "-" * 50)
+    #     print(parsed)
+    #     print("-" * 50)
+    #
+    #     # === Parse and validate ===
+    #     return self.output_format.model_validate(parsed)
 
     async def _append_tool_response(self, tool_call):
         function_name = tool_call.function.name

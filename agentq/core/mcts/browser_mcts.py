@@ -17,6 +17,7 @@ import tempfile
 from typing import List, Tuple
 
 import numpy as np
+import outlines
 import torch
 from datasets import Dataset
 from langsmith import traceable
@@ -621,6 +622,7 @@ async def train_loop(
     # === 모델 두 개 분리 로드 ===
     # 추론 전용: GPU 1
     model_infer = build_qlora_policy(model_name, gpu_num=1)
+    model_outline = outlines.from_transformers(model_infer, tokenizer)
     # 학습 전용: GPU 0
     model_train = build_qlora_policy(model_name, gpu_num=0)
 
@@ -638,8 +640,8 @@ async def train_loop(
     print(f"{BLUE}[DEBUG] Starting main function{RESET}")
 
     # 추론 에이전트는 GPU1의 model_infer 사용
-    actor = AgentQActor(model_infer, tokenizer)
-    critic = AgentQCritic(model_infer, tokenizer)
+    actor = AgentQActor(model_outline, tokenizer)
+    critic = AgentQCritic(model_outline, tokenizer)
     vision = VisionAgent()  # 외부 API 기반이면 GPU 미사용
 
     # ---- LoRA 어댑터 동기화 유틸 ----
