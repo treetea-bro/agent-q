@@ -10,8 +10,8 @@ from typing import (
 from playwright.async_api import Page
 from typing_extensions import Annotated
 
-from agentq.core.web_driver.playwright import PlaywrightManager
 from agentq.core.skills.press_key_combination import press_key_combination
+from agentq.core.web_driver.playwright import PlaywrightManager
 from agentq.utils.dom_helper import get_element_outer_html
 from agentq.utils.dom_mutation_observer import subscribe, unsubscribe
 from agentq.utils.logger import logger
@@ -181,6 +181,9 @@ async def entertext(
     # logger.info(
     #     f"######### About to call do_entertext with: selector={query_selector}, text={text_to_enter}"
     # )
+    print("query_selector", "-" * 50)
+    print(query_selector)
+    print("-" * 50)
     result = await do_entertext(page, query_selector, text_to_enter)
     # logger.info(f"#########do_entertext returned: {result}")
     await asyncio.sleep(

@@ -137,6 +137,9 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
                 query_selector=f"[mmid='{action.mmid}']",
                 text=action.content,
             )
+            print("entry", "-" * 40)
+            print(entry)
+            print("-" * 40)
             await entertext(entry)
             # await wait_for_navigation()
             print(f"{CYAN}[DEBUG] Typed text into element{RESET}")
