@@ -624,7 +624,7 @@ async def train_loop(
     model_infer = build_qlora_policy(model_name, gpu_num=1)
     model_outline = outlines.from_transformers(model_infer, tokenizer)
     # 학습 전용: GPU 0
-    model_train = build_qlora_policy(model_name, gpu_num=0)
+    # model_train = build_qlora_policy(model_name, gpu_num=0)
 
     # === 브라우저 초기화 ===
     if not eval_mode:
@@ -712,7 +712,7 @@ async def train_loop(
         )
 
         trainer = DPOTrainer(
-            model=model_train,
+            model=model_infer,
             ref_model=None,
             args=dpo_args,
             train_dataset=train_dataset,
@@ -723,7 +723,7 @@ async def train_loop(
         last_trainer = trainer
 
         print(f"{YELLOW}[INFO] Syncing LoRA adapters: train(GPU0) → infer(GPU1){RESET}")
-        sync_lora_adapters(trainer.model, model_infer)
+        # sync_lora_adapters(trainer.model, model_infer)
 
         actor.update_model(model_infer)
 
