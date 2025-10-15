@@ -305,18 +305,29 @@ class PlaywrightManager:
             if page != page_to_keep:  # Check if the current page is not the one to keep
                 await page.close()  # type: ignore
 
-    async def go_to_homepage(self):
-        page: Page = await PlaywrightManager.get_current_page(self)
-        try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
-        except Exception as e:
-            logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
-        try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
-        except Exception as e:
-            logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
+    async def go_to_homepage(self, max_retries: int = 2, timeout: int = 10000):
+        """
+        Navigate to the homepage with retry logic.
+
+        Args:
+            max_retries (int): Maximum number of attempts (default: 2).
+            timeout (int): Timeout per attempt in milliseconds (default: 10000).
+        """
+        page: Page = await self.get_current_page()
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                await page.goto(self._homepage, timeout=timeout)
+                logger.debug(f"Successfully navigated to homepage: {self._homepage}")
+                return
+            except Exception as e:
+                attempt += 1
+                logger.error(
+                    f"Failed to navigate to homepage (attempt {attempt}/{max_retries}): {e}"
+                )
+                if attempt >= max_retries:
+                    logger.error("All attempts to navigate to homepage failed.")
+                    raise
 
     async def set_navigation_handler(self):
         page: Page = await PlaywrightManager.get_current_page(self)
