@@ -109,36 +109,12 @@ class BaseAgent:
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
 
-        # ✅ 안전하게 문자열/딕셔너리 자동 구분
-        parsed = None
-        if isinstance(outputs, str):
-            try:
-                parsed = json.loads(outputs)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    f"❌ Failed to parse model output as JSON: {e}\n--- raw tail ---\n{outputs[-400:]}"
-                )
-                raise ValueError("Model output was a string but not valid JSON.")
-        elif isinstance(outputs, dict):
-            parsed = outputs
-        else:
-            logger.error(f"❌ Unexpected model output type: {type(outputs)}")
-            raise TypeError(
-                f"Expected model output to be str or dict, but got {type(outputs)}"
-            )
-
-        # ✅ Pydantic 모델 검증
-        try:
-            validated = self.output_format.model_validate(parsed)
-        except Exception as e:
-            logger.error(f"❌ Validation failed for model output: {e}")
-            raise
-
-        print("parsed", "-" * 50)
-        print(parsed)
+        print("outputs", "-" * 50)
+        print(outputs)
         print("-" * 50)
 
-        return validated
+        parsed = json.loads(outputs)
+        return self.output_format.model_validate(parsed)
 
     # async def run(
     #     self,

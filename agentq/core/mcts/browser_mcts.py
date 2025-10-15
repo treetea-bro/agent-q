@@ -621,17 +621,11 @@ async def train_loop(
     print(f"{BLUE}Starting QLoRA-DPO Loop{RESET}")
     playwright_manager = PlaywrightManager()
 
-    # === 토크나이저 공용 ===
     tokenizer = build_tokenizer(model_name)
 
-    # === 모델 두 개 분리 로드 ===
-    # 추론 전용: GPU 1
-    model_infer = build_qlora_policy(model_name, gpu_num=1)
-    model_outline = outlines.from_transformers(model_infer, tokenizer)
-    # 학습 전용: GPU 0
-    # model_train = build_qlora_policy(model_name, gpu_num=0)
+    model = build_qlora_policy(model_name, gpu_num=1)
+    model_outline = outlines.from_transformers(model, tokenizer)
 
-    # === 브라우저 초기화 ===
     if not eval_mode:
         await playwright_manager.async_initialize()
     else:
@@ -644,36 +638,9 @@ async def train_loop(
     print(f"{GREEN}Browser started and ready{RESET}")
     print(f"{BLUE}[DEBUG] Starting main function{RESET}")
 
-    # 추론 에이전트는 GPU1의 model_infer 사용
     actor = AgentQActor(model_outline, tokenizer)
     critic = AgentQCritic(model_outline, tokenizer)
     vision = VisionAgent()  # 외부 API 기반이면 GPU 미사용
-
-    # ---- LoRA 어댑터 동기화 유틸 ----
-    def sync_lora_adapters(src_peft_model, dst_peft_model):
-        """
-        src(학습모델)의 LoRA 어댑터 가중치를 임시 디렉토리에 저장 후
-        dst(추론모델)에 로드한다. PEFT 호환 방식을 사용해 안전하게 동기화.
-        """
-        tmpdir = tempfile.mkdtemp(prefix="lora_sync_")
-        try:
-            # LoRA 어댑터만 저장 (merge 하지 않음)
-            src_peft_model.save_pretrained(tmpdir)
-            # 추론모델에 어댑터 로드
-            # 최신 peft는 load_adapter 지원. 없으면 state_dict로 대체.
-            try:
-                dst_peft_model.load_adapter(
-                    tmpdir, adapter_name="default", is_trainable=False
-                )
-                if hasattr(dst_peft_model, "set_adapter"):
-                    dst_peft_model.set_adapter("default")
-            except Exception:
-                # fallback: 상태 dict 직접 로드 (strict=False)
-                dst_peft_model.load_state_dict(
-                    src_peft_model.state_dict(), strict=False
-                )
-        finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
 
     last_trainer = None
     for i, objective in enumerate(objectives):
@@ -689,7 +656,6 @@ async def train_loop(
 
         print(f"\n========== LOOP {i + 1}/{num_iterations} ==========")
 
-        # ---- 1) MCTS로 데이터 수집 (GPU1 / model_infer) ----
         result = await browser_mcts_wrapper()
         BrowserMCTSWrapper.print_result(result)
 
@@ -717,7 +683,7 @@ async def train_loop(
         )
 
         trainer = DPOTrainer(
-            model=model_infer,
+            model=model,
             ref_model=None,
             args=dpo_args,
             train_dataset=train_dataset,
@@ -728,9 +694,8 @@ async def train_loop(
         last_trainer = trainer
 
         print(f"{YELLOW}[INFO] Syncing LoRA adapters: train(GPU0) → infer(GPU1){RESET}")
-        # sync_lora_adapters(trainer.model, model_infer)
 
-        actor.update_model(model_infer)
+        actor.update_model(model)
 
         del trainer
 
@@ -819,8 +784,6 @@ async def train_loop_unsloth(
 
     def sync_lora_adapters(src_peft_model, dst_peft_model):
         """LoRA adapter weight sync"""
-        import shutil
-        import tempfile
 
         tmpdir = tempfile.mkdtemp(prefix="lora_sync_")
         try:
@@ -912,8 +875,8 @@ if __name__ == "__main__":
                 objectives=objectives,
                 # model_name="openai/gpt-oss-20b",
                 # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-                model_name="Qwen/Qwen3-4B-Instruct-2507",
-                # model_name="Qwen/Qwen2.5-14B-Instruct",
+                # model_name="Qwen/Qwen3-4B-Instruct-2507",
+                model_name="Qwen/Qwen2.5-14B-Instruct",
             )
         )
     elif provider == "unsloth":
