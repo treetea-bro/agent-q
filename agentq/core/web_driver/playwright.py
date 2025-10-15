@@ -123,54 +123,7 @@ class PlaywrightManager:
             PlaywrightManager._playwright = None  # type: ignore
 
     async def create_browser_context(self):
-        # load_dotenv()
-        # user_data_dir: str = os.environ["BROWSER_USER_DATA_DIR"]
-        # profile_directory: str = os.environ["BROWSER_PROFILE"]
-        # print("Browser profile", user_data_dir)
-        # logger.info("Browser Profile - " + user_data_dir + profile_directory)
         try:
-            # PlaywrightManager._browser_context = (
-            #     await PlaywrightManager._playwright.chromium.launch_persistent_context(
-            #         user_data_dir=user_data_dir,
-            #         channel="chrome",
-            #         headless=self.isheadless,
-            #         args=[
-            #             f"--profile-directory={profile_directory}",
-            #             "--disable-session-crashed-bubble",
-            #             "--disable-infobars",
-            #             "--no-default-browser-check",
-            #             "--no-first-run",
-            #             "--disable-popup-blocking",
-            #             "--disable-notifications",
-            #             "--disable-features=ChromeWhatsNewUI",
-            #             "--disable-blink-features=AutomationControlled",
-            #             "--disable-gpu",
-            #             "--no-sandbox",
-            #             "--disable-dev-shm-usage",
-            #             "--no-first-run",
-            #             "--no-zygote",
-            #             "--ignore-certificate-errors",
-            #             "--disable-popup-blocking",
-            #             "--remote-debugging-port=9222",
-            #             "--restore-last-session",
-            #         ],
-            #         ignore_default_args=["--enable-automation", "--bwsi"],
-            #         no_viewport=True,
-            #     )
-            # )
-
-            # await PlaywrightManager._playwright.chromium.launch_persistent_context(
-            #     user_data_dir=user_data_dir,
-            #     channel="chrome",
-            #     headless=False,
-            #     args=[
-            #         f"--profile-directory={profile_directory}",
-            #         "--remote-debugging-port=9224",
-            #     ],
-            #     no_viewport=True,
-            # )
-
-            # in eval mode - start a temp browser.
             if self.eval_mode:
                 print("Starting in eval mode", self.eval_mode)
                 new_user_dir = tempfile.mkdtemp()
@@ -262,23 +215,20 @@ class PlaywrightManager:
         Returns:
             Page: The current page if any.
         """
-        try:
-            browser: BrowserContext = await self.get_browser_context()  # type: ignore
-            # Filter out closed pages
-            pages: List[Page] = [page for page in browser.pages if not page.is_closed()]
-            page: Union[Page, None] = pages[-1] if pages else None
-            logger.debug(f"Current page: {page.url if page else None}")
-            if page is not None:
-                return page
-            else:
-                page: Page = await browser.new_page()  # type: ignore
-                # await stealth_async(page)  # Apply stealth to the new page
-                return page
-        except Exception as e:
-            logger.warn(f"Browser context was closed. Creating a new one. {e}")
-            PlaywrightManager._browser_context = None
-            await self.ensure_browser_context()
-            return await self.get_current_page()
+        print("get_current_page", "-" * 50)
+        print(get_current_page)
+        print("-" * 50)
+        browser: BrowserContext = await self.get_browser_context()  # type: ignore
+        # Filter out closed pages
+        pages: List[Page] = [page for page in browser.pages if not page.is_closed()]
+        page: Union[Page, None] = pages[-1] if pages else None
+        logger.debug(f"Current page: {page.url if page else None}")
+        if page is not None:
+            return page
+        else:
+            page: Page = await browser.new_page()  # type: ignore
+            # await stealth_async(page)  # Apply stealth to the new page
+            return page
 
     async def close_all_tabs(self, keep_first_tab: bool = True):
         """
