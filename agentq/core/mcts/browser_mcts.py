@@ -89,7 +89,6 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         playwright_manager = PlaywrightManager()
         await playwright_manager.go_to_homepage()
 
-        await wait_for_navigation()
         # initialzie dom and url
         initial_dom = await self.get_current_dom()
         initial_url = await self.get_current_url()
@@ -175,8 +174,51 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         print(f"{GREEN}[DEBUG] After action execution - New URL: {new_url}{RESET}")
         return new_dom, new_url
 
+    async def wait_for_dom_stable(
+        page: Page, timeout: int = 8000, check_interval: int = 500
+    ):
+        """
+        일정 시간 동안 DOM이 변하지 않으면 안정되었다고 판단.
+        SPA (예: YouTube) 의 동적 렌더링이 끝날 때까지 기다림.
+        """
+        print("[DEBUG] Waiting for DOM to stabilize...")
+        start = time.time()
+        prev_dom = ""
+        while time.time() - start < timeout / 1000:
+            try:
+                dom_snapshot = await page.evaluate("document.documentElement.innerHTML")
+            except Exception:
+                await asyncio.sleep(check_interval / 1000)
+                continue
+
+            if dom_snapshot == prev_dom:
+                print("[DEBUG] DOM stabilized ✅")
+                return True
+            prev_dom = dom_snapshot
+            await asyncio.sleep(check_interval / 1000)
+        print("[WARN] DOM stabilization timeout ⏰")
+        return False
+
     async def get_current_dom(self) -> str:
-        await wait_for_navigation()
+        """
+        안정된 DOM을 가져오며, mmid 손실을 방지하기 위해
+        - network idle 대기
+        - DOM 안정화 감지
+        - 안정 버퍼 슬립
+        을 수행.
+        """
+        playwright_manager = PlaywrightManager()
+        page = await playwright_manager.get_current_page()
+
+        print(f"{YELLOW}[DEBUG] Waiting for network idle state...{RESET}")
+        await page.wait_for_load_state("networkidle", timeout=15000)
+
+        print(f"{YELLOW}[DEBUG] Checking for stable DOM...{RESET}")
+        await wait_for_dom_stable(page, timeout=8000, check_interval=500)
+
+        # 안정 버퍼 — JS hydration 이후 약간의 여유를 줌
+        await asyncio.sleep(1.0)
+
         dom = await get_dom_with_content_type(content_type="all_fields")
         print(f"{CYAN}[DEBUG] Got current DOM (length: {len(dom)}){RESET}")
         return str(dom)[:4000]
