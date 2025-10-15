@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
+# from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
 
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # os.environ["OMP_NUM_THREADS"] = "4"
