@@ -104,6 +104,7 @@ class BaseAgent:
         parsed = json.loads(outputs)
         ic(parsed)
 
+        del inputs
         del outputs
 
         return self.output_format.model_validate(parsed)
