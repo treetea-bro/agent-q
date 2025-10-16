@@ -3,6 +3,7 @@ import os
 from typing import Callable, List, Optional, Tuple, Type
 
 import openai
+from icecream import ic
 from instructor import Mode, patch
 from pydantic import BaseModel
 
@@ -144,9 +145,8 @@ class BaseAgent:
                     tool_choice="auto",
                     tools=self.tools_list,
                 )
-            print("outputs", "-" * 50)
-            print(response)
-            print("-" * 50)
+
+            ic(response)
 
             try:
                 assert isinstance(response, self.output_format)

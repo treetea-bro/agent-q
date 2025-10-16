@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
+from icecream import ic
 from outlines.inputs import Chat
 from pydantic import BaseModel
 
@@ -100,12 +101,7 @@ class BaseAgent:
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
 
-        print("outputs", "-" * 50)
-        print(outputs)
-        print("-" * 50)
-        print("outputs length", "-" * 50)
-        print(len(outputs))
-        print("-" * 50)
+        ic(outputs)
 
         parsed = json.loads(outputs)
         return self.output_format.model_validate(parsed)
