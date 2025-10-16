@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from colorama import Fore, init
 from dotenv import load_dotenv
+from langsmith import traceable
 
 from agentq.core.agent.base import BaseAgent
 from agentq.core.models.models import (

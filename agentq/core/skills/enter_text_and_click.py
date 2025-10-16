@@ -3,10 +3,10 @@ import inspect
 
 from typing_extensions import Annotated
 
-from agentq.core.web_driver.playwright import PlaywrightManager
 from agentq.core.skills.click_using_selector import do_click
 from agentq.core.skills.enter_text_using_selector import do_entertext
 from agentq.core.skills.press_key_combination import do_press_key_combination
+from agentq.core.web_driver.playwright import PlaywrightManager
 from agentq.utils.logger import logger
 
 
@@ -103,7 +103,7 @@ async def enter_text_and_click(
         do_click_result = await do_click(
             page, click_selector, wait_before_click_execution
         )
-        result["detailed_message"] += f' {do_click_result["detailed_message"]}'
+        result["detailed_message"] += f" {do_click_result['detailed_message']}"
         # await browser_manager.notify_user(do_click_result["summary_message"])
 
     await asyncio.sleep(

@@ -1,19 +1,17 @@
 import base64
 
+from playwright.async_api import Page
 from typing_extensions import Annotated, Optional
 
 from agentq.core.web_driver.playwright import PlaywrightManager
 from agentq.utils.logger import logger
-from playwright.async_api import Page
 
 
 async def get_screenshot(
-        webpage: Optional[Page] = None
-) -> (
-    Annotated[
-        str, "Returns a base64 encoded screenshot of the current active web page."
-    ]
-):
+    webpage: Optional[Page] = None,
+) -> Annotated[
+    str, "Returns a base64 encoded screenshot of the current active web page."
+]:
     """
     Captures and returns a base64 encoded screenshot of the current page (only the visible viewport and not the full page)
 
@@ -25,8 +23,8 @@ async def get_screenshot(
         # Create and use the PlaywrightManager
         browser_manager = PlaywrightManager(browser_type="chromium", headless=False)
         if webpage is not None:
-            page = webpage 
-        else: 
+            page = webpage
+        else:
             page = await browser_manager.get_current_page()
         logger.info("page {page}")
 

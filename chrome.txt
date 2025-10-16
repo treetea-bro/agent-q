@@ -24,7 +24,7 @@ google-chrome \
   --no-sandbox \
   about:blank
 
-2. Headless 모드 + 디버그 포트로 실행
+2. Non Headless 모드 + 디버그 포트로 실행
 google-chrome \
   --disable-gpu \
   --remote-debugging-port=9222 \
