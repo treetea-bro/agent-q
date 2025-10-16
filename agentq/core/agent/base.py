@@ -87,17 +87,13 @@ class BaseAgent:
 
         inputs = Chat(self.messages)
 
-        print("inputs", "-" * 50)
-        print(inputs)
-        print("-" * 50)
-
         start_time = datetime.now()
         print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         outputs = self.model(
             inputs,
             self.output_format,
-            max_new_tokens=2048,
+            max_new_tokens=4092,
         )
 
         end_time = datetime.now()
@@ -106,6 +102,9 @@ class BaseAgent:
 
         print("outputs", "-" * 50)
         print(outputs)
+        print("-" * 50)
+        print("outputs length", "-" * 50)
+        print(len(outputs))
         print("-" * 50)
 
         parsed = json.loads(outputs)
