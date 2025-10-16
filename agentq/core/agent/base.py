@@ -101,8 +101,8 @@ class BaseAgent:
         print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
 
+        ic(outputs)
         parsed = json.loads(outputs)
-        ic(parsed)
 
         del inputs
         del outputs
