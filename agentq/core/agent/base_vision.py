@@ -2,17 +2,15 @@ import json
 import os
 from typing import Callable, List, Optional, Tuple, Type
 
-import instructor
-import instructor.patch
 import openai
-from instructor import Mode
+from instructor import Mode, patch
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
 from agentq.utils.logger import logger
 
 
-class BaseAgent:
+class BaseAgentVision:
     def __init__(
         self,
         name: str,
@@ -44,14 +42,14 @@ class BaseAgent:
 
         # Llm client
         if client == "openai":
-            self.client = openai.Client()
+            base_client = openai.Client()
         elif client == "together":
-            self.client = openai.OpenAI(
+            base_client = openai.OpenAI(
                 base_url="https://api.together.xyz/v1",
                 api_key=os.environ["TOGETHER_API_KEY"],
             )
 
-        self.client = instructor.from_openai(self.client, mode=Mode.JSON)
+        self.client = patch(base_client, mode=Mode.JSON)
 
         # Tools
         self.tools_list = []
@@ -67,7 +65,6 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    @traceable(run_type="chain", name="agent_run")
     async def run(
         self,
         input_data: BaseModel,

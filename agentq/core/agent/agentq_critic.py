@@ -1,7 +1,7 @@
 from datetime import datetime
 from string import Template
 
-from agentq.core.agent.base_local import BaseAgent
+from agentq.core.agent.base import BaseAgent
 from agentq.core.memory import ltm
 from agentq.core.models.models import AgentQCriticInput, AgentQCriticOutput
 from agentq.core.prompts.prompts import LLM_PROMPTS

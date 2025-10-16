@@ -11,6 +11,7 @@ import numpy as np
 import outlines
 import torch
 from datasets import Dataset
+from langsmith import traceable
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from playwright.async_api import Page
 from transformers import (
@@ -63,6 +64,7 @@ CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
+@traceable(run_type="chain", name="mcts")
 class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
     def __init__(self, objective: str, vision: BaseAgent) -> None:
         super().__init__()
@@ -126,9 +128,6 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
                 query_selector=f"[mmid='{action.mmid}']",
                 text=action.content,
             )
-            print("entry", "-" * 40)
-            print(entry)
-            print("-" * 40)
             await entertext(entry)
             # await wait_for_navigation()
             print(f"{CYAN}[DEBUG] Typed text into element{RESET}")
@@ -167,7 +166,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         await wait_for_navigation()
         dom = await get_dom_with_content_type(content_type="all_fields")
         print(f"{CYAN}[DEBUG] Got current DOM (length: {len(dom)}){RESET}")
-        return str(dom)[:4000]
+        return str(dom)
 
     async def get_current_url(self) -> str:
         # await wait_for_navigation()
@@ -192,9 +191,6 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             current_page_dom=state.dom,
             current_page_url=state.url,
         )
-        print("actor_input", "-" * 40)
-        print(actor_input)
-        print("-" * 40)
         actor_output: AgentQActorOutput = await self.actor.run(actor_input)
 
         proposed_tasks_with_actions: List[TaskWithActions] = actor_output.proposed_tasks
@@ -488,13 +484,9 @@ def pairs_to_dataset(pairs: List[DPOPair]) -> Dataset:
             }
         )
 
-    # === 4️⃣ Dataset 변환 ===
     dataset = Dataset.from_list(rows)
     print(f"✅ Created DPO dataset with {len(rows)} examples")
     return dataset
-
-
-# ============ QLoRA Helper ============
 
 
 def print_trainable_params(model):
