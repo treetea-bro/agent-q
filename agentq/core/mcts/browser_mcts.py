@@ -712,9 +712,9 @@ if __name__ == "__main__":
         train_loop(
             objectives=objectives,
             # model_name="openai/gpt-oss-20b",
-            # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+            model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
             # model_name="Qwen/Qwen3-4B-Instruct-2507",
-            model_name="Qwen/Qwen2.5-14B-Instruct",
+            # model_name="Qwen/Qwen2.5-14B-Instruct",
         )
     )
     print(f"{GREEN}[DEBUG] Script finished{RESET}")
