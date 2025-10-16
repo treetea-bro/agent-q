@@ -4,7 +4,6 @@ from typing import Callable, List, Optional, Tuple, Type
 
 import openai
 from instructor import Mode, patch
-from langsmith import traceable
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
@@ -66,7 +65,6 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    @traceable(run_type="chain", name="agent_run")
     async def run(
         self,
         input_data: BaseModel,

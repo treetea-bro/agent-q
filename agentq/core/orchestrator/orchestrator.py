@@ -5,7 +5,6 @@ from typing import Dict, List
 
 from colorama import Fore, init
 from dotenv import load_dotenv
-from langsmith import traceable
 
 from agentq.core.agent.base import BaseAgent
 from agentq.core.models.models import (
@@ -452,7 +451,7 @@ class Orchestrator:
         await self.playwright_manager.stop_playwright()
 
     def _print_memory_and_agent(self, agent_type: str):
-        print(f"{Fore.CYAN}{'='*50}")
+        print(f"{Fore.CYAN}{'=' * 50}")
         print(f"{Fore.YELLOW}Current State: {Fore.GREEN}{self.memory.current_state}")
         print(f"{Fore.YELLOW}Agent: {Fore.GREEN}{agent_type}")
         print(f"{Fore.YELLOW}Current Thought: {Fore.GREEN}{self.memory.thought}")
@@ -473,23 +472,23 @@ class Orchestrator:
             for task in self.memory.completed_tasks:
                 status = "✓" if task.result else " "
                 print(f"{Fore.GREEN}  [{status}] {task.id}. {task.description}")
-        print(f"{Fore.CYAN}{'='*50}")
+        print(f"{Fore.CYAN}{'=' * 50}")
 
     def _print_task_result(self, task: Task):
-        print(f"{Fore.CYAN}{'='*50}")
+        print(f"{Fore.CYAN}{'=' * 50}")
         print(f"{Fore.YELLOW}Task Completed: {Fore.GREEN}{task.description}")
         print(f"{Fore.YELLOW}Result:")
         wrapped_result = textwrap.wrap(task.result, width=80)
         for line in wrapped_result:
             print(f"{Fore.WHITE}{line}")
-        print(f"{Fore.CYAN}{'='*50}")
+        print(f"{Fore.CYAN}{'=' * 50}")
 
     def _print_final_response(self):
-        print(f"\n{Fore.GREEN}{'='*50}")
+        print(f"\n{Fore.GREEN}{'=' * 50}")
         print(f"{Fore.GREEN}Objective Completed!")
-        print(f"{Fore.GREEN}{'='*50}")
+        print(f"{Fore.GREEN}{'=' * 50}")
         print(f"{Fore.YELLOW}Final Response:")
         wrapped_response = textwrap.wrap(self.memory.final_response, width=80)
         for line in wrapped_response:
             print(f"{Fore.WHITE}{line}")
-        print(f"{Fore.GREEN}{'='*50}")
+        print(f"{Fore.GREEN}{'=' * 50}")

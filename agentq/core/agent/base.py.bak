@@ -6,7 +6,6 @@ import instructor
 import instructor.patch
 import openai
 from instructor import Mode
-from langsmith import traceable
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
