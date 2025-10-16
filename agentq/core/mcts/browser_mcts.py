@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-# from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
+from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
 
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # os.environ["OMP_NUM_THREADS"] = "4"
@@ -12,8 +12,6 @@ load_dotenv()
 import asyncio
 import json
 import os
-import shutil
-import tempfile
 from typing import List, Tuple
 
 import numpy as np
@@ -775,31 +773,13 @@ async def train_loop_unsloth(
     await playwright_manager.async_initialize()
 
     # ---- 모델 / 토크나이저 로드 ----
-    model_train, tokenizer = build_unsloth_policy(model_name)
+    model, tokenizer = build_unsloth_policy(model_name)
+    model_train = outlines.from_transformers(model, tokenizer)
 
     # ---- 에이전트 초기화 ----
     actor = AgentQActor(model_train, tokenizer)
     critic = AgentQCritic(model_train, tokenizer)
     vision = VisionAgent()
-
-    def sync_lora_adapters(src_peft_model, dst_peft_model):
-        """LoRA adapter weight sync"""
-
-        tmpdir = tempfile.mkdtemp(prefix="lora_sync_")
-        try:
-            src_peft_model.save_pretrained(tmpdir)
-            try:
-                dst_peft_model.load_adapter(
-                    tmpdir, adapter_name="default", is_trainable=False
-                )
-                if hasattr(dst_peft_model, "set_adapter"):
-                    dst_peft_model.set_adapter("default")
-            except Exception:
-                dst_peft_model.load_state_dict(
-                    src_peft_model.state_dict(), strict=False
-                )
-        finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
 
     last_trainer = None
     for i, objective in enumerate(objectives):
@@ -814,12 +794,10 @@ async def train_loop_unsloth(
             exploration_weight=1.0,
         )
 
-        # === 1️⃣ MCTS로 DPO Pair 생성 ===
         result = await browser_mcts_wrapper()
         dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result)
         train_dataset = pairs_to_dataset(dpo_pairs)
 
-        # === 2️⃣ DPO 학습 ===
         print(f"{YELLOW}[INFO] Training DPO with Unsloth Trainer{RESET}")
         training_args = TrainingArguments(
             per_device_train_batch_size=1,
@@ -849,7 +827,6 @@ async def train_loop_unsloth(
         last_trainer = trainer
 
         print(f"{YELLOW}[INFO] Syncing LoRA adapters (train → infer){RESET}")
-        sync_lora_adapters(trainer.model, model_train)
         actor.update_model(model_train)
 
         del trainer
@@ -867,7 +844,7 @@ if __name__ == "__main__":
         "Play the most viewed Pokemon movie.",
         "Play the most viewed movie on YouTube.",
     ]
-    provider = "hf"
+    provider = "unsloth"
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     if provider == "hf":
         asyncio.run(
