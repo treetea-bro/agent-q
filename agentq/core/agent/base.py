@@ -147,9 +147,6 @@ class BaseAgent:
             print("outputs", "-" * 50)
             print(response)
             print("-" * 50)
-            print("outputs length", "-" * 50)
-            print(len(response))
-            print("-" * 50)
 
             try:
                 assert isinstance(response, self.output_format)
