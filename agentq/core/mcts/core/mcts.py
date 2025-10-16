@@ -388,7 +388,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self._output_cum_reward = -math.inf
         self._output_iter = None
         self.root = MCTSNode(
-            state=None,
+            state=await self.world_model.init_state(),
             action=None,
             parent=None,
             calc_q=self.calc_q,
