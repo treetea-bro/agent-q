@@ -1,11 +1,13 @@
 import json
-from datetime import datetime
+import os
 from typing import Callable, List, Optional, Tuple, Type
 
-from outlines.inputs import Chat
+import openai
+from instructor import Mode, patch
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
+from agentq.utils.logger import logger
 
 
 class BaseAgent:
@@ -19,31 +21,43 @@ class BaseAgent:
         output_format: Type[BaseModel],
         tools: Optional[List[Tuple[Callable, str]]] = None,
         keep_message_history: bool = True,
+        client: str = "openai",
     ):
-        # Metadata
-        self.model = model
-        self.tokenizer = tokenizer
+        # Metdata
         self.agent_name = name
 
         # Messages
         self.system_prompt = system_prompt
+        # handling the case where agent has to do async intialisation as system prompt depends on some async functions.
+        # in those cases, we do init with empty system prompt string and then handle adding system prompt to messages array in the agent itself
         if self.system_prompt:
             self._initialize_messages()
         self.keep_message_history = keep_message_history
 
-        # I/O schemas
+        # Input-output format
         self.input_format = input_format
         self.output_format = output_format
+
+        # Set global configurations for litellm
+        # litellm.logging = True
+        # litellm.set_verbose = True
+
+        # Llm client
+        if client == "openai":
+            base_client = openai.Client()
+        elif client == "together":
+            base_client = openai.OpenAI(
+                base_url="https://api.together.xyz/v1",
+                api_key=os.environ["TOGETHER_API_KEY"],
+            )
+
+        self.client = patch(base_client, mode=Mode.JSON)
 
         # Tools
         self.tools_list = []
         self.executable_functions_list = {}
         if tools:
             self._initialize_tools(tools)
-
-    def update_model(self, model):
-        print(f"[BaseAgent] Model updated in-memory: {self.agent_name}")
-        self.model = model
 
     def _initialize_tools(self, tools: List[Tuple[Callable, str]]):
         for func, func_desc in tools:
@@ -56,56 +70,120 @@ class BaseAgent:
     async def run(
         self,
         input_data: BaseModel,
-        screenshot: str | None = None,
-        session_id: str | None = None,
+        screenshot: str = None,
+        session_id: str = None,
+        # model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+        model: str = "gpt-4o",
     ) -> BaseModel:
         if not isinstance(input_data, self.input_format):
             raise ValueError(f"Input data must be of type {self.input_format.__name__}")
 
-        # Reset messages if history not kept
+        # Handle message history.
         if not self.keep_message_history:
             self._initialize_messages()
 
-        self.messages.append(
-            {
-                "role": "user",
-                "content": input_data.model_dump_json(
-                    exclude={"current_page_dom", "current_page_url"}
-                ),
-            }
-        )
+        if screenshot:
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": input_data.model_dump_json(
+                                exclude={"current_page_dom", "current_page_url"}
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": screenshot}},
+                    ],
+                }
+            )
+        else:
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": input_data.model_dump_json(
+                        exclude={"current_page_dom", "current_page_url"}
+                    ),
+                }
+            )
 
+        # input dom and current page url in a separate message so that the LLM can pay attention to completed tasks better. *based on personal vibe check*
         if hasattr(input_data, "current_page_dom") and hasattr(
             input_data, "current_page_url"
         ):
             self.messages.append(
                 {
                     "role": "user",
-                    "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
+                    "content": f"Current page URL:\n{input_data.current_page_url}\n\n Current page DOM:\n{input_data.current_page_dom}",
                 }
             )
 
-        inputs = Chat(self.messages)
+        # logger.info(self.messages)
 
-        start_time = datetime.now()
-        print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        # TODO: add a max_turn here to prevent a inifinite fallout
+        while True:
+            # TODO:
+            # 1. exeception handling while calling the client
+            # 2. remove the else block as JSON mode in instrutor won't allow us to pass in tools.
+            if len(self.tools_list) == 0:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    # model="gpt-4o-2024-08-06",
+                    # model="gpt-4o-mini",
+                    # model="groq/llama3-groq-70b-8192-tool-use-preview",
+                    # model="xlam-1b-fc-r",
+                    messages=self.messages,
+                    response_model=self.output_format,
+                    max_retries=4,
+                )
+            else:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=self.messages,
+                    response_model=self.output_format,
+                    tool_choice="auto",
+                    tools=self.tools_list,
+                )
+            print("outputs", "-" * 50)
+            print(response)
+            print("-" * 50)
+            print("outputs length", "-" * 50)
+            print(len(response))
+            print("-" * 50)
 
-        outputs = self.model(
-            inputs,
-            self.output_format,
-            max_new_tokens=4092,
-        )
+            try:
+                assert isinstance(response, self.output_format)
+            except AssertionError:
+                raise TypeError(
+                    f"Expected response_message to be of type {self.output_format.__name__}, but got {type(response).__name__}"
+                )
+            return response
 
-        end_time = datetime.now()
-        print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
-
-        print("outputs", "-" * 50)
-        print(outputs)
-        print("-" * 50)
-        print("outputs length", "-" * 50)
-        print(len(outputs))
-        print("-" * 50)
-
-        parsed = json.loads(outputs)
-        return self.output_format.model_validate(parsed)
+    async def _append_tool_response(self, tool_call):
+        function_name = tool_call.function.name
+        function_to_call = self.executable_functions_list[function_name]
+        function_args = json.loads(tool_call.function.arguments)
+        try:
+            function_response = await function_to_call(**function_args)
+            # print(function_response)
+            self.messages.append(
+                {
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": str(function_response),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error occurred calling the tool {function_name}: {str(e)}")
+            self.messages.append(
+                {
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": str(
+                        "The tool responded with an error, please try again with a different tool or modify the parameters of the tool",
+                        function_response,
+                    ),
+                }
+            )
