@@ -191,6 +191,9 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             current_page_dom=state.dom,
             current_page_url=state.url,
         )
+        print("actor_input", "-" * 50)
+        print(actor_input)
+        print("-" * 50)
         actor_output: AgentQActorOutput = await self.actor.run(actor_input)
 
         proposed_tasks_with_actions: List[TaskWithActions] = actor_output.proposed_tasks
@@ -523,8 +526,8 @@ def build_qlora_policy(model_name: str, gpu_num: int = 0):
 
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            device_map={"": gpu_num},
-            # device_map="auto",
+            # device_map={"": gpu_num},
+            device_map="auto",
             trust_remote_code=True,
         )
 
@@ -544,8 +547,8 @@ def build_qlora_policy(model_name: str, gpu_num: int = 0):
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             quantization_config=bnb_config,
-            device_map={"": gpu_num},
-            # device_map="auto",
+            # device_map={"": gpu_num},
+            device_map="auto",
             trust_remote_code=True,
         )
 
