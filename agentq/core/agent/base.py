@@ -71,7 +71,7 @@ class BaseAgent:
         screenshot: str = None,
         session_id: str = None,
         # model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4o",
     ) -> BaseModel:
         if not isinstance(input_data, self.input_format):
             raise ValueError(f"Input data must be of type {self.input_format.__name__}")
