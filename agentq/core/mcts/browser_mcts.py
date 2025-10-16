@@ -710,11 +710,11 @@ if __name__ == "__main__":
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     asyncio.run(
         train_loop(
-            objectives=objectives,
-            # model_name="openai/gpt-oss-20b",
-            model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-            # model_name="Qwen/Qwen3-4B-Instruct-2507",
-            # model_name="Qwen/Qwen2.5-14B-Instruct",
+            objectives,
+            "Salesforce/Llama-xLAM-2-8b-fc-r",
+            # "openai/gpt-oss-20b",
+            # "Qwen/Qwen3-4B-Instruct-2507",
+            # "Qwen/Qwen2.5-14B-Instruct",
         )
     )
     print(f"{GREEN}[DEBUG] Script finished{RESET}")
