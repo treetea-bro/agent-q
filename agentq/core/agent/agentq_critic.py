@@ -14,8 +14,6 @@ class AgentQCritic(BaseAgent):
         self.ltm = self.__get_ltm()
         self.system_prompt = self.__modify_system_prompt(self.ltm)
         super().__init__(
-            model=model,
-            tokenizer=tokenizer,
             name=self.name,
             system_prompt=self.system_prompt,
             input_format=AgentQCriticInput,
