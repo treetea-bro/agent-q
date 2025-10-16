@@ -2,10 +2,10 @@ import json
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, Type
 
+from outlines.inputs import Chat
 from pydantic import BaseModel
 
 from agentq.utils.function_utils import get_function_schema
-from agentq.utils.logger import logger
 
 
 class BaseAgent:
@@ -53,7 +53,6 @@ class BaseAgent:
     def _initialize_messages(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-    # @traceable(run_type="chain", name="agent_run")
     async def run(
         self,
         input_data: BaseModel,
@@ -87,14 +86,15 @@ class BaseAgent:
                 }
             )
 
-        inputs = self.tokenizer.apply_chat_template(
-            self.messages,
-            add_generation_prompt=True,
-            tokenize=False,
-            return_tensors=None,
-            # return_dict=True,
-            # reasoning_effort="low",
-        )
+        inputs = Chat(self.messages)
+        # inputs = self.tokenizer.apply_chat_template(
+        #     self.messages,
+        #     add_generation_prompt=True,
+        #     tokenize=False,
+        #     return_tensors=None,
+        #     # return_dict=True,
+        #     # reasoning_effort="low",
+        # )
 
         start_time = datetime.now()
         print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -115,100 +115,3 @@ class BaseAgent:
 
         parsed = json.loads(outputs)
         return self.output_format.model_validate(parsed)
-
-    # async def run(
-    #     self,
-    #     input_data: BaseModel,
-    #     screenshot: str | None = None,
-    #     session_id: str | None = None,
-    # ) -> BaseModel:
-    #     if not isinstance(input_data, self.input_format):
-    #         raise ValueError(f"Input data must be of type {self.input_format.__name__}")
-    #
-    #     # Reset messages if history not kept
-    #     if not self.keep_message_history:
-    #         self._initialize_messages()
-    #
-    #     self.messages.append(
-    #         {
-    #             "role": "user",
-    #             "content": input_data.model_dump_json(
-    #                 exclude={"current_page_dom", "current_page_url"}
-    #             ),
-    #         }
-    #     )
-    #
-    #     # Add DOM context if present
-    #     if hasattr(input_data, "current_page_dom") and hasattr(
-    #         input_data, "current_page_url"
-    #     ):
-    #         self.messages.append(
-    #             {
-    #                 "role": "user",
-    #                 "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
-    #             }
-    #         )
-    #
-    #     inputs = self.tokenizer.apply_chat_template(
-    #         self.messages,
-    #         add_generation_prompt=True,
-    #         return_tensors="pt",
-    #         return_dict=True,
-    #         reasoning_effort="low",
-    #     ).to(self.model.device)
-    #
-    #     start_time = datetime.now()
-    #     print(f"🚀 Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    #
-    #     outputs = self.model.fast_generate(
-    #         **inputs,
-    #         max_new_tokens=2048,
-    #     )
-    #     end_time = datetime.now()
-    #     print(f"🏁 End:   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    #     print(f"⏱ Duration: {(end_time - start_time).total_seconds():.2f} seconds")
-    #
-    #     generated_tokens = outputs[0][inputs["input_ids"].shape[-1] :]
-    #     decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-    #
-    #     print("decoded", "-" * 50)
-    #     print(decoded)
-    #     print("-" * 50)
-    #
-    #     # del decoded
-    #     # del generated_tokens
-    #     # del outputs
-    #     # del inputs
-    #
-    #     parsed = self._extract_json_from_output(decoded)
-    #     print("parsed", "-" * 50)
-    #     print(parsed)
-    #     print("-" * 50)
-    #
-    #     # === Parse and validate ===
-    #     return self.output_format.model_validate(parsed)
-
-    async def _append_tool_response(self, tool_call):
-        function_name = tool_call.function.name
-        function_to_call = self.executable_functions_list[function_name]
-        function_args = json.loads(tool_call.function.arguments)
-        try:
-            function_response = await function_to_call(**function_args)
-            self.messages.append(
-                {
-                    "tool_call_id": tool_call.id,
-                    "role": "tool",
-                    "name": function_name,
-                    "content": str(function_response),
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error occurred calling the tool {function_name}: {str(e)}")
-            self.messages.append(
-                {
-                    "tool_call_id": tool_call.id,
-                    "role": "tool",
-                    "name": function_name,
-                    "content": "Tool error: please modify parameters and retry.",
-                }
-            )

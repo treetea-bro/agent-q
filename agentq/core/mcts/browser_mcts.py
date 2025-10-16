@@ -1,14 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-# from unsloth import FastLanguageModel  # isort: skip  # noqa: E402
 
-# os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# os.environ["OMP_NUM_THREADS"] = "4"
-# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
-#
-# torch.backends.cuda.matmul.allow_tf32 = False
-# torch.backends.cudnn.benchmark = False
 import asyncio
 import json
 import os
@@ -25,7 +18,6 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    TrainingArguments,
 )
 from trl import DPOTrainer
 from trl.trainer.dpo_config import DPOConfig
@@ -588,7 +580,6 @@ def build_qlora_policy(model_name: str, gpu_num: int = 0):
 
     model = get_peft_model(model, lora_config)
 
-    # 디버그용 파라미터 출력
     print_trainable_params(model)
 
     print(f"{GREEN}[SUCCESS] QLoRA policy model built successfully!{RESET}")
@@ -596,9 +587,7 @@ def build_qlora_policy(model_name: str, gpu_num: int = 0):
 
 
 def build_tokenizer(model_name: str):
-    tok = AutoTokenizer.from_pretrained(
-        model_name, use_fast=True, trust_remote_code=True
-    )
+    tok = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "right"
@@ -634,7 +623,7 @@ async def train_loop(
 
     actor = AgentQActor(model_outline, tokenizer)
     critic = AgentQCritic(model_outline, tokenizer)
-    vision = VisionAgent()  # 외부 API 기반이면 GPU 미사용
+    vision = VisionAgent()
 
     last_trainer = None
     for i, objective in enumerate(objectives):
@@ -716,150 +705,20 @@ class StreamToFile:
         self.file.close()
 
 
-def build_unsloth_policy(model_name: str, max_seq_len: int = 4096):
-    print(f"{YELLOW}[INFO] Loading {model_name} via Unsloth (QLoRA 4-bit){RESET}")
-
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_len,
-        load_in_4bit=True,  # NF4 quantization
-        dtype=None,  # Auto: bf16 / fp16
-        # device_map="auto",
-        device_map={"": 1},
-    )
-
-    # LoRA 어댑터 설정
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=8,
-        lora_alpha=16,
-        lora_dropout=0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        target_modules=[
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-        ],
-    )
-
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
-
-    print(f"{GREEN}[SUCCESS] Unsloth policy built successfully!{RESET}")
-    return model, tokenizer
-
-
-# =====================
-# Main Train Loop
-# =====================
-async def train_loop_unsloth(
-    objectives: list[str],
-    model_name: str,
-    output_dir: str = "./dpo_final_unsloth",
-    eval_mode: bool = False,
-):
-    print(f"{BLUE}Starting Unsloth QLoRA-DPO Loop{RESET}")
-    playwright_manager = PlaywrightManager()
-    await playwright_manager.async_initialize()
-
-    # ---- 모델 / 토크나이저 로드 ----
-    model, tokenizer = build_unsloth_policy(model_name)
-    model_train = outlines.from_transformers(model, tokenizer)
-
-    # ---- 에이전트 초기화 ----
-    actor = AgentQActor(model_train, tokenizer)
-    critic = AgentQCritic(model_train, tokenizer)
-    vision = VisionAgent()
-
-    last_trainer = None
-    for i, objective in enumerate(objectives):
-        print(f"\n========== LOOP {i + 1}/{len(objectives)} ==========")
-        browser_mcts_wrapper = BrowserMCTSWrapper(
-            objective=objective,
-            actor=actor,
-            critic=critic,
-            vision=vision,
-            n_iterations=10,
-            depth_limit=6,
-            exploration_weight=1.0,
-        )
-
-        result = await browser_mcts_wrapper()
-        dpo_pairs = BrowserMCTSWrapper.generate_dpo_pairs(result)
-        train_dataset = pairs_to_dataset(dpo_pairs)
-
-        print(f"{YELLOW}[INFO] Training DPO with Unsloth Trainer{RESET}")
-        training_args = TrainingArguments(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
-            learning_rate=2e-5,
-            num_train_epochs=1,
-            bf16=True,
-            optim="paged_adamw_32bit",
-            lr_scheduler_type="cosine",
-            warmup_ratio=0.05,
-            remove_unused_columns=False,
-            report_to=["none"],
-            logging_steps=10,
-            output_dir=output_dir,
-            save_strategy="no",
-        )
-
-        trainer = DPOTrainer(
-            model=model_train,
-            ref_model=None,
-            tokenizer=tokenizer,
-            train_dataset=train_dataset,
-            args=training_args,
-        )
-
-        trainer.train()
-        last_trainer = trainer
-
-        print(f"{YELLOW}[INFO] Syncing LoRA adapters (train → infer){RESET}")
-        actor.update_model(model_train)
-
-        del trainer
-
-    if last_trainer is not None:
-        os.makedirs(output_dir, exist_ok=True)
-        last_trainer.model.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
-        print(f"✅ 최종 LoRA 어댑터 포함 모델 저장 → {output_dir}")
-
-
 if __name__ == "__main__":
     objectives = [
         "Play the latest episode of Friends.",
         "Play the most viewed Pokemon movie.",
         "Play the most viewed movie on YouTube.",
     ]
-    provider = "hf"
     print(f"{BLUE}[DEBUG] Script started{RESET}")
-    if provider == "hf":
-        asyncio.run(
-            train_loop(
-                objectives=objectives,
-                # model_name="openai/gpt-oss-20b",
-                # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
-                # model_name="Qwen/Qwen3-4B-Instruct-2507",
-                model_name="Qwen/Qwen2.5-14B-Instruct",
-            )
+    asyncio.run(
+        train_loop(
+            objectives=objectives,
+            # model_name="openai/gpt-oss-20b",
+            # model_name="Qwen/Qwen3-30B-A3B-Instruct-2507",
+            # model_name="Qwen/Qwen3-4B-Instruct-2507",
+            model_name="Qwen/Qwen2.5-14B-Instruct",
         )
-    elif provider == "unsloth":
-        asyncio.run(
-            train_loop_unsloth(
-                objectives,
-                "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
-                # "unsloth/Qwen3-14B-unsloth-bnb-4bit",
-                # "unsloth/Qwen3-32B-unsloth-bnb-4bit",
-                # model_name="Qwen/Qwen3-30B-A3B-Instruct",
-            )
-        )
+    )
     print(f"{GREEN}[DEBUG] Script finished{RESET}")
