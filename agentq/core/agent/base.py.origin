@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from agentq.utils.function_utils import get_function_schema
 from agentq.utils.logger import logger
 
+
 class BaseAgent:
     def __init__(
         self,
@@ -143,21 +144,12 @@ class BaseAgent:
                     tool_choice="auto",
                     tools=self.tools_list,
                 )
-
-            # instructor directly outputs response.choices[0].message. so we will do response_message = response
-            # response_message = response.choices[0].message
-
-            # instructor does not support funciton in JSON mode
-            # if response_message.tool_calls:
-            #     tool_calls = response_message.tool_calls
-
-            # if tool_calls:
-            #     self.messages.append(response_message)
-            #     for tool_call in tool_calls:
-            #         await self._append_tool_response(tool_call)
-            #     continue
-
-            # parsed_response_content: self.output_format = response_message.parsed
+            print("outputs", "-" * 50)
+            print(response)
+            print("-" * 50)
+            print("outputs length", "-" * 50)
+            print(len(response))
+            print("-" * 50)
 
             try:
                 assert isinstance(response, self.output_format)

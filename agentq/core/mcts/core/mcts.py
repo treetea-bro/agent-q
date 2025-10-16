@@ -17,7 +17,6 @@ from agentq.core.mcts.core.base import (
     Trace,
     WorldModel,
 )
-from agentq.core.web_driver.playwright import PlaywrightManager
 
 
 class MCTSNode(Generic[State, Action, Example]):
@@ -388,7 +387,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self._output_cum_reward = -math.inf
         self._output_iter = None
         self.root = MCTSNode(
-            state=await self.world_model.init_state(),
+            state=None,
             action=None,
             parent=None,
             calc_q=self.calc_q,
@@ -401,8 +400,9 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         ):
             print(f"-----iter: {iter}----")
             # start with home page for each iteration
-            playwright_manager = PlaywrightManager()
-            await playwright_manager.go_to_homepage()
+            # playwright_manager = PlaywrightManager()
+            # await playwright_manager.go_to_homepage()
+            self.root.state = await self.world_model.init_state()
             path = await self.iterate(self.root)
             if self.output_trace_in_each_iter:
                 self.trace_in_each_iter.append(deepcopy(path))
