@@ -1,7 +1,3 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import asyncio
 import io
 import json
@@ -158,49 +154,48 @@ You are an agent that automates YouTube interactions using tools. Analyze the cu
 async def run_with_xlam(user_input: str):
     await playwright.async_initialize()
 
-    prompt = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT + await get_current_dom()},
-        {"role": "user", "content": user_input},
-    ]
+    for _ in range(5):
+        prompt = [
+            {"role": "system", "content": LLM_SYSTEM_PROMPT + await get_current_dom()},
+            {"role": "user", "content": user_input},
+        ]
 
-    # tokenizer의 chat template 활용
-    inputs = tokenizer.apply_chat_template(
-        prompt,
-        tools=TOOLS,
-        add_generation_prompt=True,
-        return_dict=True,
-        return_tensors="pt",
-    )
+        inputs = tokenizer.apply_chat_template(
+            prompt,
+            tools=TOOLS,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
+        )
 
-    input_ids_len = inputs["input_ids"].shape[-1]
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        input_ids_len = inputs["input_ids"].shape[-1]
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
-    outputs = model.generate(**inputs, max_new_tokens=1024)
-    generated_tokens = outputs[:, input_ids_len:]
-    generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+        outputs = model.generate(**inputs, max_new_tokens=1024)
+        generated_tokens = outputs[:, input_ids_len:]
+        generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
-    ic(generated_text)
+        ic(generated_text)
 
-    # JSON function call 순차 실행
-    try:
-        func_calls = json.loads(generated_text)
-        if isinstance(func_calls, list):
-            for call in func_calls:
-                fn_name = call.get("name")
-                args = call.get("arguments", {})
+        try:
+            func_calls = json.loads(generated_text)
+            if isinstance(func_calls, list):
+                for call in func_calls:
+                    fn_name = call.get("name")
+                    args = call.get("arguments", {})
 
-                if fn_name == "search":
-                    params = SearchParams(**args)
-                    await search(params)
-                elif fn_name == "apply_youtube_filters":
-                    params = FilterParams(**args)
-                    await apply_youtube_filters(params)
-                elif fn_name == "click_video_by_title":
-                    params = ClickVideoParams(**args)
-                    await click_video_by_title(params)
+                    if fn_name == "search":
+                        params = SearchParams(**args)
+                        await search(params)
+                    elif fn_name == "apply_youtube_filters":
+                        params = FilterParams(**args)
+                        await apply_youtube_filters(params)
+                    elif fn_name == "click_video_by_title":
+                        params = ClickVideoParams(**args)
+                        await click_video_by_title(params)
 
-    except Exception as error:
-        ic(error)
+        except Exception as error:
+            ic(error)
 
 
 if __name__ == "__main__":

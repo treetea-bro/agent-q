@@ -5,15 +5,12 @@ import re
 import unicodedata
 
 import ollama
-from dotenv import load_dotenv
 from icecream import ic
 from PIL import Image
 
 from agentq.core.web_driver.playwright import PlaywrightManager
 from models import ClickVideoParams, FilterParams, SearchParams
 from tools import TOOLS
-
-load_dotenv()
 
 playwright = PlaywrightManager()
 
@@ -140,13 +137,13 @@ async def run_with_llama(user_input: str):
     model_name = "llama4:latest"
 
     for step in range(5):
-        print("ollama start")
         screenshot_bytes = await get_current_screen()
         messages = [
             {"role": "system", "content": LLM_SYSTEM_PROMPT},
             {"role": "user", "content": user_input, "images": [screenshot_bytes]},
         ]
 
+        print("ollama start")
         response = await ollama.AsyncClient().chat(
             model=model_name,
             messages=messages,
@@ -158,6 +155,7 @@ async def run_with_llama(user_input: str):
         tool_calls = []
         if "message" in response and "content" in response["message"]:
             content = response["message"]["content"]
+            ic(content)
             clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
             json_matches = re.findall(
                 r"\{(?:[^{}]|\{[^{}]*\})*\}", clean_content, re.DOTALL
