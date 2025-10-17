@@ -430,8 +430,8 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
 
 
 async def wait_for_navigation(max_retries=3):
-    for attempt in range(max_retries):
-        try:
+    try:
+        for attempt in range(max_retries):
             playwright_manager = PlaywrightManager()
             page = await playwright_manager.get_current_page()
             await page.wait_for_load_state("domcontentloaded", timeout=30000)
@@ -439,10 +439,10 @@ async def wait_for_navigation(max_retries=3):
                 f"{GREEN}[DEBUG] Navigation successful on attempt {attempt + 1}{RESET}"
             )
             return
-        except Exception as e:
-            print(
-                f"{YELLOW}[DEBUG] Navigation error on attempt {attempt + 1}: {str(e)}{RESET}"
-            )
+    except Exception as e:
+        print(
+            f"{YELLOW}[DEBUG] Navigation error on attempt {attempt + 1}: {str(e)}{RESET}"
+        )
     print(f"{RED}[DEBUG] Navigation failed after {max_retries} attempts{RESET}")
 
 

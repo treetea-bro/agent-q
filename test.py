@@ -5,13 +5,35 @@ load_dotenv()
 import asyncio
 import json
 
+from icecream import ic
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from agentq.core.skills.get_dom_with_content_type import get_dom_with_content_type
 from agentq.core.web_driver.playwright import PlaywrightManager
 from models import ClickVideoParams, FilterParams, SearchParams
 from tools import TOOLS
 
 playwright = PlaywrightManager()
+
+
+async def wait_for_navigation(max_retries=3):
+    try:
+        for attempt in range(max_retries):
+            playwright_manager = PlaywrightManager()
+            page = await playwright_manager.get_current_page()
+            await page.wait_for_load_state("domcontentloaded", timeout=30000)
+            print(f"[DEBUG] Navigation successful on attempt {attempt + 1}")
+            return
+    except Exception as e:
+        print(f"[DEBUG] Navigation error on attempt {attempt + 1}: {str(e)}")
+    print(f"[DEBUG] Navigation failed after {max_retries} attempts")
+
+
+async def get_current_dom() -> str:
+    await wait_for_navigation()
+    dom = await get_dom_with_content_type(content_type="all_fields")
+    ic(dom)
+    return "\n\nCurrent DOM: " + str(dom)
 
 
 # ==============================
@@ -118,52 +140,50 @@ Available filters:
 async def run_with_xlam(user_input: str):
     await playwright.async_initialize()
 
-    prompt = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT},
-        {"role": "user", "content": user_input},
-    ]
+    for i in range(3):
+        prompt = [
+            {"role": "system", "content": LLM_SYSTEM_PROMPT + await get_current_dom()},
+            {"role": "user", "content": user_input},
+        ]
 
-    # tokenizer의 chat template 활용
-    inputs = tokenizer.apply_chat_template(
-        prompt,
-        tools=TOOLS,
-        add_generation_prompt=True,
-        return_dict=True,
-        return_tensors="pt",
-    )
+        # tokenizer의 chat template 활용
+        inputs = tokenizer.apply_chat_template(
+            prompt,
+            tools=TOOLS,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
+        )
 
-    input_ids_len = inputs["input_ids"].shape[-1]
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        input_ids_len = inputs["input_ids"].shape[-1]
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
-    outputs = model.generate(**inputs, max_new_tokens=1024)
-    generated_tokens = outputs[:, input_ids_len:]
-    generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+        outputs = model.generate(**inputs, max_new_tokens=1024)
+        generated_tokens = outputs[:, input_ids_len:]
+        generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
-    print("=== LLM Generated Text ===")
-    print(generated_text)
+        ic(generated_text)
 
-    # JSON function call 순차 실행
-    try:
-        func_calls = json.loads(generated_text)
-        if isinstance(func_calls, list):
-            for call in func_calls:
-                fn_name = call.get("name")
-                args = call.get("arguments", {})
+        # JSON function call 순차 실행
+        try:
+            func_calls = json.loads(generated_text)
+            if isinstance(func_calls, list):
+                for call in func_calls:
+                    fn_name = call.get("name")
+                    args = call.get("arguments", {})
 
-                if fn_name == "search":
-                    params = SearchParams(**args)
-                    await search(params)
-                elif fn_name == "apply_youtube_filters":
-                    params = FilterParams(**args)
-                    await apply_youtube_filters(params)
-                elif fn_name == "click_video_by_title":
-                    params = ClickVideoParams(**args)
-                    await click_video_by_title(params)
+                    if fn_name == "search":
+                        params = SearchParams(**args)
+                        await search(params)
+                    elif fn_name == "apply_youtube_filters":
+                        params = FilterParams(**args)
+                        await apply_youtube_filters(params)
+                    elif fn_name == "click_video_by_title":
+                        params = ClickVideoParams(**args)
+                        await click_video_by_title(params)
 
-    except Exception as e:
-        print("Could not parse function call. LLM output:")
-        print(generated_text)
-        print("Error:", e)
+        except Exception as error:
+            ic(error)
 
 
 if __name__ == "__main__":
