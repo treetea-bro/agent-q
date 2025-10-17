@@ -228,7 +228,7 @@ async def run_with_gemma(user_input: str):
 
     # Call Ollama with tools
     response = ollama.chat(
-        model="gemma3:27b",
+        model="llama4:latest",
         messages=messages,
         tools=TOOLS,
         options={"temperature": 0.5},  # Adjust as needed
