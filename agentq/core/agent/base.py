@@ -68,24 +68,34 @@ class BaseAgent:
         if not self.keep_message_history:
             self._initialize_messages()
 
-        self.messages.append(
-            {
-                "role": "user",
-                "content": input_data.model_dump_json(
-                    exclude={"current_page_dom", "current_page_url"}
-                ),
-            }
+        content = input_data.model_dump_json(
+            exclude={"current_page_dom", "current_page_url"}
         )
-
         if hasattr(input_data, "current_page_dom") and hasattr(
             input_data, "current_page_url"
         ):
-            self.messages.append(
-                {
-                    "role": "user",
-                    "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
-                }
-            )
+            content += f"\n\nCurrent page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}"
+
+        self.messages.append({"role": "user", "content": content})
+
+        # self.messages.append(
+        #     {
+        #         "role": "user",
+        #         "content": input_data.model_dump_json(
+        #             exclude={"current_page_dom", "current_page_url"}
+        #         ),
+        #     }
+        # )
+        #
+        # if hasattr(input_data, "current_page_dom") and hasattr(
+        #     input_data, "current_page_url"
+        # ):
+        #     self.messages.append(
+        #         {
+        #             "role": "user",
+        #             "content": f"Current page URL:\n{input_data.current_page_url}\n\nCurrent page DOM:\n{input_data.current_page_dom}",
+        #         }
+        #     )
 
         inputs = Chat(self.messages)
 
