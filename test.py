@@ -149,12 +149,14 @@ async def run_with_llama(user_input: str):
 
     for step in range(max_steps):
         # Ollama 호출
+        print("ollama start")
         response = await ollama.AsyncClient().chat(
             model=model_name,
             messages=messages,
             tools=TOOLS,
             options={"temperature": 0.5, "num_ctx": 8192},
         )
+        print("ollama end")
 
         ic(response)
 
@@ -197,7 +199,9 @@ async def run_with_llama(user_input: str):
                     await click_video_by_title(params)
 
         # 다음 스텝을 위해 새 스크린샷과 메시지 업데이트
+        print("screenshot start")
         screenshot_bytes = await get_current_screenshot()
+        print("screenshot end")
         messages.append(
             {"role": "assistant", "content": response["message"]["content"]}
         )
