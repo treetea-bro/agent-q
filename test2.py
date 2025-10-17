@@ -6,7 +6,6 @@ import asyncio
 import io
 import json
 
-import ollama
 from icecream import ic
 from PIL import Image
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -204,100 +203,9 @@ async def run_with_xlam(user_input: str):
         ic(error)
 
 
-# if __name__ == "__main__":
-#     asyncio.run(
-#         run_with_xlam(
-#             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
-#         )
-#     )
-
-
-# Function Calling Runner with Llama4 (개선: content에서 직접 파싱, multi-step 루프 추가)
-async def run_with_llama(user_input: str):
-    await playwright.async_initialize()
-    model_name = "llama4:latest"
-
-    # 초기 스크린샷
-    screenshot_bytes = await get_current_screenshot()
-    messages = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT},
-        {"role": "user", "content": user_input, "images": [screenshot_bytes]},
-    ]
-    max_steps = 5  # 최대 스텝 제한 (무한 루프 방지)
-
-    for step in range(max_steps):
-        # Ollama 호출
-        response = await ollama.AsyncClient().chat(
-            model=model_name,
-            messages=messages,
-            tools=TOOLS,
-            options={"temperature": 0.5, "num_ctx": 8192},  # 컨텍스트 증가
-        )
-        ic(response)
-
-        # tool_calls가 없으면 content에서 JSON 추출 (로그처럼 직접 파싱)
-        tool_calls = []
-        if "message" in response and "content" in response["message"]:
-            content = response["message"]["content"]
-            # 여러 JSON 객체 추출 (로그처럼 <|...|> 같은 노이즈 제거)
-            clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
-            json_matches = re.findall(r"\{.*?\}", clean_content, re.DOTALL)
-            for json_str in json_matches:
-                try:
-                    tool_call = json.loads(json_str)
-                    tool_calls.append(tool_call)
-                except json.JSONDecodeError:
-                    print(f"JSON parse error: {json_str}")
-
-        if not tool_calls:
-            print("No tool calls generated. Stopping.")
-            break
-
-        # Tool calls 실행
-        for call in tool_calls:
-            if "type" in call and call["type"] == "function":
-                fn_name = call.get("name")
-                args = call.get("parameters", {})  # 'parameters'로 변경 (로그 기반)
-
-                if fn_name == "search":
-                    params = SearchParams(**args)
-                    await search(params)
-                elif fn_name == "apply_youtube_filters":
-                    # 로그에서 'group' -> 'group_name' 매핑 (호환성)
-                    for f in args.get("filters", []):
-                        if "group" in f:
-                            f["group_name"] = f.pop("group")
-                        if "option" in f:
-                            f["option_label"] = f.pop("option")
-                    params = FilterParams(**args)
-                    await apply_youtube_filters(params)
-                elif fn_name == "click_video_by_title":
-                    params = ClickVideoParams(**args)
-                    await click_video_by_title(params)
-
-        # 다음 스텝을 위해 새 스크린샷과 메시지 업데이트
-        screenshot_bytes = await get_current_screenshot()
-        messages.append(
-            {"role": "assistant", "content": response["message"]["content"]}
-        )
-        messages.append(
-            {
-                "role": "user",
-                "content": "Continue based on the new page state.",
-                "images": [screenshot_bytes],
-            }
-        )
-
-        # 완료 조건 (예: 비디오 클릭 후 종료)
-        if any("click_video_by_title" in call.get("name", "") for call in tool_calls):
-            print("Video clicked. Task complete.")
-            break
-
-
 if __name__ == "__main__":
-    load_dotenv()
     asyncio.run(
-        run_with_llama(
+        run_with_xlam(
             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
         )
     )

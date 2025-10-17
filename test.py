@@ -9,9 +9,7 @@ import json
 import ollama
 from icecream import ic
 from PIL import Image
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from agentq.core.skills.get_dom_with_content_type import get_dom_with_content_type
 from agentq.core.web_driver.playwright import PlaywrightManager
 from models import ClickVideoParams, FilterParams, SearchParams
 from tools import TOOLS
@@ -32,16 +30,10 @@ async def wait_for_navigation(max_retries=3):
     print(f"[DEBUG] Navigation failed after {max_retries} attempts")
 
 
-async def get_current_dom() -> str:
-    await wait_for_navigation()
-    dom = await get_dom_with_content_type(content_type="all_fields")
-    return "\n\nCurrent DOM: " + str(dom)
-
-
-async def get_current_screenshot() -> bytes:
+async def get_current_screen() -> bytes:
     await wait_for_navigation()
     page = await playwright.get_current_page()
-    screenshot_bytes = await page.screenshot(full_page=True)
+    screenshot_bytes = await page.screenshot(full_page=False)
 
     # Resize to 896x896 using PIL
     img = Image.open(io.BytesIO(screenshot_bytes))
@@ -128,17 +120,6 @@ async def click_video_by_title(params: ClickVideoParams, timeout: int = 10000):
 
 
 # ==============================
-# 🔧 Load xLAM Model
-# ==============================
-model_name = "Salesforce/Llama-xLAM-2-8b-fc-r"
-# model_name = "Salesforce/xLAM-2-1b-fc-r"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name, device_map="auto", dtype="auto"
-)
-
-
-# ==============================
 # 📝 Instruction
 # ==============================
 LLM_SYSTEM_PROMPT = """
@@ -153,72 +134,12 @@ You are an agent that automates YouTube interactions using tools. Analyze the cu
 """
 
 
-# ==============================
-# ⚡ Function Calling Runner
-# ==============================
-async def run_with_xlam(user_input: str):
-    await playwright.async_initialize()
-
-    prompt = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT + await get_current_dom()},
-        {"role": "user", "content": user_input},
-    ]
-
-    # tokenizer의 chat template 활용
-    inputs = tokenizer.apply_chat_template(
-        prompt,
-        tools=TOOLS,
-        add_generation_prompt=True,
-        return_dict=True,
-        return_tensors="pt",
-    )
-
-    input_ids_len = inputs["input_ids"].shape[-1]
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
-
-    outputs = model.generate(**inputs, max_new_tokens=1024)
-    generated_tokens = outputs[:, input_ids_len:]
-    generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-
-    ic(generated_text)
-
-    # JSON function call 순차 실행
-    try:
-        func_calls = json.loads(generated_text)
-        if isinstance(func_calls, list):
-            for call in func_calls:
-                fn_name = call.get("name")
-                args = call.get("arguments", {})
-
-                if fn_name == "search":
-                    params = SearchParams(**args)
-                    await search(params)
-                elif fn_name == "apply_youtube_filters":
-                    params = FilterParams(**args)
-                    await apply_youtube_filters(params)
-                elif fn_name == "click_video_by_title":
-                    params = ClickVideoParams(**args)
-                    await click_video_by_title(params)
-
-    except Exception as error:
-        ic(error)
-
-
-# if __name__ == "__main__":
-#     asyncio.run(
-#         run_with_xlam(
-#             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
-#         )
-#     )
-
-
-# Function Calling Runner with Llama4 (개선: content에서 직접 파싱, multi-step 루프 추가)
 async def run_with_llama(user_input: str):
     await playwright.async_initialize()
     model_name = "llama4:latest"
 
     # 초기 스크린샷
-    screenshot_bytes = await get_current_screenshot()
+    screenshot_bytes = await get_current_screen()
     messages = [
         {"role": "system", "content": LLM_SYSTEM_PROMPT},
         {"role": "user", "content": user_input, "images": [screenshot_bytes]},
