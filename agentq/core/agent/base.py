@@ -52,8 +52,8 @@ class BaseAgent:
             self.executable_functions_list[func.__name__] = func
 
     def _initialize_messages(self):
-        self.messages = [{"role": "system", "content": self.system_prompt}]
-        # self.messages = []
+        # self.messages = [{"role": "system", "content": self.system_prompt}]
+        self.messages = []
 
     async def run(
         self,
