@@ -100,21 +100,60 @@ model = AutoModelForCausalLM.from_pretrained(
 
 
 # ==============================
-# 📝 Instruction
+# 🌐 YouTube Language Detection
 # ==============================
-LLM_SYSTEM_PROMPT = """
+async def detect_youtube_lang():
+    page = await playwright.get_current_page()
+    lang = await page.get_attribute("html", "lang")
+    if lang:
+        lang = lang.lower()
+        if lang.startswith("ko"):
+            return "ko"
+        elif lang.startswith("en"):
+            return "en"
+    # 기본값 영어
+    return "en"
+
+
+def get_system_prompt(lang: str) -> str:
+    if lang == "ko":
+        return """
+You are a YouTube automation assistant.
+사용자의 요청을 수행하기 위해 필요한 모든 단계를 실행하세요.
+응답은 반드시 `name`과 `arguments`를 가진 JSON 배열로만 제공합니다.
+
+사용 가능한 액션: search, apply_youtube_filters, click_video_by_title
+
+사용 가능한 필터 (한글):
+- 업로드 날짜: 지난 1시간, 오늘, 이번 주, 이번 달, 올해
+- 구분: 동영상, 채널, 재생목록, 영화
+- 길이: 4분 미만, 4~20분, 20분 초과
+- 기능별: 라이브, 4K, HD, 자막, 크리에이티브 커먼즈, 360°, VR180, 3D, HDR
+- 위치: 구입한 항목
+- 정렬기준: 관련성, 업로드 날짜, 조회수, 평점
+
+예시 출력:
+[
+  {"name": "search", "arguments": {"query": "Pokémon AMV"}},
+  {"name": "apply_youtube_filters", "arguments": {"filters":[{"group_name":"기능별","option_label":"4K"}]}},
+  {"name": "click_video_by_title", "arguments": {"title": "Pokémon Full Battle AMV"}}
+]
+"""
+    else:
+        # 영어
+        return """
 You are a YouTube automation assistant.
 Execute all steps needed to fulfill the user's request.
 Respond ONLY in a JSON array of actions with `name` and `arguments`.
 
 Available actions: search, apply_youtube_filters, click_video_by_title
 
-
 Available filters:
 - Upload date: Last hour, Today, This week, This month, This year
 - Type: Video, Channel, Playlist, Movie
 - Duration: Under 4 minutes, 4 - 20 minutes, Over 20 minutes
 - Features: Live, 4K, HD, Subtitles/CC, Creative Commons, 360°, VR180, 3D, HDR
+- Location: Purchased
 - Sort by: Relevance, Upload date, View count, Rating
 
 Example output:
@@ -123,25 +162,24 @@ Example output:
   {"name": "apply_youtube_filters", "arguments": {"filters":[{"group_name":"Features","option_label":"4K"}]}},
   {"name": "click_video_by_title", "arguments": {"title": "Pokémon Full Battle AMV"}}
 ]
-
-You are a YouTube automation assistant.
-
-You can:
-1. Search YouTube by keyword
-2. Apply multiple filters (Upload date, Type, Duration, Features, Sort by)
-3. Click a video by exact title
-
 """
 
 
 # ==============================
-# ⚡ Function Calling Runner
+# ⚡ Function Calling Runner (리팩토링)
 # ==============================
 async def run_with_xlam(user_input: str):
     await playwright.async_initialize()
 
+    # YouTube 언어 감지
+    lang = await detect_youtube_lang()
+    print("Detected YouTube language:", lang)
+
+    # 언어별 시스템 프롬프트 설정
+    system_prompt = get_system_prompt(lang)
+
     prompt = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_input},
     ]
 
