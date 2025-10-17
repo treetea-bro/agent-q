@@ -163,6 +163,7 @@ async def run_with_xlam(user_input: str):
 
     # 언어별 시스템 프롬프트 설정
     system_prompt = get_system_prompt(lang)
+    print(system_prompt)
 
     prompt = [
         {"role": "system", "content": system_prompt},
