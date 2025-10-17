@@ -121,10 +121,36 @@ async def click_video_by_title(params: ClickVideoParams, timeout: int = 10000):
     return False
 
 
-# ==============================
-# 📝 Instruction
-# ==============================
-LLM_SYSTEM_PROMPT = """
+async def detect_youtube_language() -> str:
+    """Detect whether YouTube is in Korean or English."""
+    page = await playwright.get_current_page()
+    html_lang = await page.get_attribute("html", "lang")
+    if html_lang and html_lang.startswith("ko"):
+        print("🌐 YouTube language detected: Korean")
+        return "ko"
+    print("🌐 YouTube language detected: English")
+    return "en"
+
+
+def get_system_prompt(language: str) -> str:
+    """Return system prompt text based on detected language."""
+    if language == "ko":
+        return """
+사용 가능한 필터:
+- 업로드 날짜: 지난 1시간, 오늘, 이번 주, 이번 달, 올해
+- 구분: 동영상, 채널, 재생목록, 영화
+- 길이: 4분 미만, 4~20분, 20분 초과
+- 기능별: 라이브, 4K, HD, 자막, 크리에이티브 커먼즈, 360°, VR180, 3D, HDR
+- 위치: 구입한 항목
+- 정렬기준: 관련성, 업로드 날짜, 조회수, 평점
+
+너는 YouTube 자동화 에이전트야.
+현재 페이지의 DOM과 스크린샷을 분석해서 어떤 도구를 호출해야 할지 판단해.
+단, **한 번에 하나의 tool만 호출**해야 해.
+결과는 반드시 JSON 형식의 tool call로만 응답해야 한다.
+        """.strip()
+    else:
+        return """
 Available filters:
 - Upload date: Last hour, Today, This week, This month, This year
 - Type: Video, Channel, Playlist, Movie
@@ -132,20 +158,28 @@ Available filters:
 - Features: Live, 4K, HD, Subtitles/CC, Creative Commons, 360°, VR180, 3D, HDR
 - Sort by: Relevance, Upload date, View count, Rating
 
-You are an agent that automates YouTube interactions using tools. Analyze the current screenshot of the page to understand the context and decide which tool to call next. Respond with tool calls in JSON format.
-"""
+You are an agent that automates YouTube interactions using tools.
+Analyze the current DOM and screenshot to understand the context
+and decide which tool to call next.
+
+⚠️ You must call **only one tool at a time.**
+Your response must be a single JSON tool call — nothing else.
+        """.strip()
 
 
-# ==============================
-# ⚡ Function Calling Runner
-# ==============================
 async def run_with_xlam(user_input: str):
     await playwright.async_initialize()
     model_name = "qwen3:14b"
 
+    lang = await detect_youtube_language()
+    system_prompt = get_system_prompt(lang)
+
     for _ in range(5):
         prompt = [
-            {"role": "system", "content": LLM_SYSTEM_PROMPT + await get_current_dom()},
+            {
+                "role": "system",
+                "content": system_prompt + "\n\n" + await get_current_dom(),
+            },
             {"role": "user", "content": user_input},
         ]
 
@@ -158,21 +192,19 @@ async def run_with_xlam(user_input: str):
 
         try:
             func_calls = response.message.tool_calls
+            if not func_calls:
+                print("⚠️ No tool calls detected.")
+                continue
+            call = func_calls[0]
+            fn_name = call.function.name
+            args = call.function.arguments
 
-            # ✅ 3️⃣ 함수 호출 처리
-            for call in func_calls:
-                fn_name = call.function.name
-                args = call.function.arguments
-
-                if fn_name == "search":
-                    params = SearchParams(**args)
-                    await search(params)
-                elif fn_name == "apply_youtube_filters":
-                    params = FilterParams(**args)
-                    await apply_youtube_filters(params)
-                elif fn_name == "click_video_by_title":
-                    params = ClickVideoParams(**args)
-                    await click_video_by_title(params)
+            if fn_name == "search":
+                await search(SearchParams(**args))
+            elif fn_name == "apply_youtube_filters":
+                await apply_youtube_filters(FilterParams(**args))
+            elif fn_name == "click_video_by_title":
+                await click_video_by_title(ClickVideoParams(**args))
 
         except Exception as error:
             ic(error)
