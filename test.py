@@ -1,7 +1,3 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import asyncio
 import io
 import json
@@ -19,15 +15,15 @@ playwright = PlaywrightManager()
 
 
 async def wait_for_navigation(max_retries=3):
-    try:
-        for attempt in range(max_retries):
+    for attempt in range(max_retries):
+        try:
             playwright_manager = PlaywrightManager()
             page = await playwright_manager.get_current_page()
             await page.wait_for_load_state("domcontentloaded", timeout=30000)
             print(f"[DEBUG] Navigation successful on attempt {attempt + 1}")
             return
-    except Exception as e:
-        print(f"[DEBUG] Navigation error on attempt {attempt + 1}: {str(e)}")
+        except Exception as e:
+            print(f"[DEBUG] Navigation error on attempt {attempt + 1}: {str(e)}")
     print(f"[DEBUG] Navigation failed after {max_retries} attempts")
 
 
@@ -139,54 +135,64 @@ async def run_with_llama(user_input: str):
     await playwright.async_initialize()
     model_name = "llama4:latest"
 
-    # 초기 스크린샷
+    # Initial screenshot
     screenshot_bytes = await get_current_screen()
     messages = [
         {"role": "system", "content": LLM_SYSTEM_PROMPT},
         {"role": "user", "content": user_input, "images": [screenshot_bytes]},
     ]
-    max_steps = 5  # 최대 스텝 제한 (무한 루프 방지)
+    max_steps = 5  # Maximum steps to prevent infinite loops
 
     for step in range(max_steps):
-        # Ollama 호출
+        # Ollama call
         print("ollama start")
-        response = await ollama.AsyncClient().chat(
-            model=model_name,
-            messages=messages,
-            tools=TOOLS,
-            options={"temperature": 0.5, "num_ctx": 8192},
-        )
-        print("ollama end")
+        try:
+            response = await ollama.AsyncClient().chat(
+                model=model_name,
+                messages=messages,
+                tools=TOOLS,
+                options={"temperature": 0.5, "num_ctx": 8192},
+            )
+            print("ollama end")
+            ic(response)
+        except Exception as e:
+            print(f"[ERROR] Ollama call failed: {str(e)}")
+            break
 
-        ic(response)
-
+        # Parse tool calls
         tool_calls = []
         if "message" in response and "content" in response["message"]:
             content = response["message"]["content"]
+            # Remove any special tags and clean content
             clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
-            json_matches = re.findall(r"\{.*?\}", clean_content, re.DOTALL)
+            # Find all JSON-like structures
+            json_matches = re.findall(r"\{[\s\S]*?\}", clean_content, re.DOTALL)
             for json_str in json_matches:
                 try:
+                    # Sanitize JSON string to ensure proper formatting
+                    json_str = json_str.replace("\n", "").strip()
                     tool_call = json.loads(json_str)
-                    tool_calls.append(tool_call)
-                except json.JSONDecodeError:
-                    print(f"JSON parse error: {json_str}")
+                    if "type" in tool_call and tool_call["type"] == "function":
+                        tool_calls.append(tool_call)
+                except json.JSONDecodeError as e:
+                    print(f"[ERROR] JSON parse error: {json_str} - {str(e)}")
+                    continue
 
         if not tool_calls:
-            print("No tool calls generated. Stopping.")
+            print("No valid tool calls generated. Stopping.")
             break
 
-        # Tool calls 실행
+        # Execute tool calls
         for call in tool_calls:
-            if "type" in call and call["type"] == "function":
-                fn_name = call.get("name")
-                args = call.get("parameters", {})  # 'parameters'로 변경 (로그 기반)
+            fn_name = call.get("name")
+            args = call.get("parameters", {})
 
+            try:
                 if fn_name == "search":
                     params = SearchParams(**args)
                     await search(params)
                 elif fn_name == "apply_youtube_filters":
-                    # 로그에서 'group' -> 'group_name' 매핑 (호환성)
+                    # Map legacy 'group' and 'option' to 'group_name' and 'option_label'
                     for f in args.get("filters", []):
                         if "group" in f:
                             f["group_name"] = f.pop("group")
@@ -197,10 +203,12 @@ async def run_with_llama(user_input: str):
                 elif fn_name == "click_video_by_title":
                     params = ClickVideoParams(**args)
                     await click_video_by_title(params)
+            except Exception as e:
+                print(f"[ERROR] Tool execution failed for {fn_name}: {str(e)}")
 
-        # 다음 스텝을 위해 새 스크린샷과 메시지 업데이트
+        # Update screenshot and messages for the next step
         print("screenshot start")
-        screenshot_bytes = await get_current_screenshot()
+        screenshot_bytes = await get_current_screen()
         print("screenshot end")
         messages.append(
             {"role": "assistant", "content": response["message"]["content"]}
@@ -213,14 +221,13 @@ async def run_with_llama(user_input: str):
             }
         )
 
-        # 완료 조건 (예: 비디오 클릭 후 종료)
+        # Stop if video was clicked
         if any("click_video_by_title" in call.get("name", "") for call in tool_calls):
             print("Video clicked. Task complete.")
             break
 
 
 if __name__ == "__main__":
-    load_dotenv()
     asyncio.run(
         run_with_llama(
             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
