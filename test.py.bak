@@ -231,14 +231,15 @@ async def run_with_llama(user_input: str):
             model=model_name,
             messages=messages,
             tools=TOOLS,
-            options={"temperature": 0.5, "num_ctx": 8192},
+            options={"temperature": 0.5, "num_ctx": 8192},  # 컨텍스트 증가
         )
-
         ic(response)
 
+        # tool_calls가 없으면 content에서 JSON 추출 (로그처럼 직접 파싱)
         tool_calls = []
         if "message" in response and "content" in response["message"]:
             content = response["message"]["content"]
+            # 여러 JSON 객체 추출 (로그처럼 <|...|> 같은 노이즈 제거)
             clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
             json_matches = re.findall(r"\{.*?\}", clean_content, re.DOTALL)
             for json_str in json_matches:
