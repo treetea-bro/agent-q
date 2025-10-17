@@ -32,7 +32,6 @@ async def wait_for_navigation(max_retries=3):
 async def get_current_dom() -> str:
     await wait_for_navigation()
     dom = await get_dom_with_content_type(content_type="all_fields")
-    ic(dom)
     return "\n\nCurrent DOM: " + str(dom)
 
 
@@ -146,6 +145,7 @@ async def run_with_xlam(user_input: str):
             {"role": "user", "content": user_input},
         ]
 
+        ic(str(prompt)[:500])
         # tokenizer의 chat template 활용
         inputs = tokenizer.apply_chat_template(
             prompt,
