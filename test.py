@@ -131,13 +131,6 @@ You are a YouTube automation assistant.
 - 기능별: 라이브, 4K, HD, 자막, 크리에이티브 커먼즈, 360°, VR180, 3D, HDR
 - 위치: 구입한 항목
 - 정렬기준: 관련성, 업로드 날짜, 조회수, 평점
-
-예시 출력:
-[
-  {"name": "search", "arguments": {"query": "Pokémon AMV"}},
-  {"name": "apply_youtube_filters", "arguments": {"filters":[{"group_name":"기능별","option_label":"4K"}]}},
-  {"name": "click_video_by_title", "arguments": {"title": "Pokémon Full Battle AMV"}}
-]
 """
     else:
         # 영어
@@ -155,13 +148,6 @@ Available filters:
 - Features: Live, 4K, HD, Subtitles/CC, Creative Commons, 360°, VR180, 3D, HDR
 - Location: Purchased
 - Sort by: Relevance, Upload date, View count, Rating
-
-Example output:
-[
-  {"name": "search", "arguments": {"query": "Pokémon AMV"}},
-  {"name": "apply_youtube_filters", "arguments": {"filters":[{"group_name":"Features","option_label":"4K"}]}},
-  {"name": "click_video_by_title", "arguments": {"title": "Pokémon Full Battle AMV"}}
-]
 """
 
 
@@ -229,6 +215,6 @@ async def run_with_xlam(user_input: str):
 if __name__ == "__main__":
     asyncio.run(
         run_with_xlam(
-            "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
+            "Search for Pokémon AMV, apply 4K filter, then click the POKEMON [AMV] Legends Never Die"
         )
     )
