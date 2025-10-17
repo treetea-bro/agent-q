@@ -2,14 +2,18 @@ import asyncio
 import io
 import json
 import re
+import unicodedata
 
 import ollama
+from dotenv import load_dotenv
 from icecream import ic
 from PIL import Image
 
 from agentq.core.web_driver.playwright import PlaywrightManager
 from models import ClickVideoParams, FilterParams, SearchParams
 from tools import TOOLS
+
+load_dotenv()
 
 playwright = PlaywrightManager()
 
@@ -163,19 +167,28 @@ async def run_with_llama(user_input: str):
         tool_calls = []
         if "message" in response and "content" in response["message"]:
             content = response["message"]["content"]
-            # Remove any special tags and clean content
+            # Remove special tags and clean content
             clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
-            # Find all JSON-like structures
-            json_matches = re.findall(r"\{[\s\S]*?\}", clean_content, re.DOTALL)
+            # Find complete JSON objects using a more robust regex
+            json_matches = re.findall(
+                r"\{(?:[^{}]|\{[^{}]*\})*\}", clean_content, re.DOTALL
+            )
             for json_str in json_matches:
                 try:
-                    # Sanitize JSON string to ensure proper formatting
-                    json_str = json_str.replace("\n", "").strip()
+                    # Decode Unicode escape sequences
+                    json_str = unicodedata.normalize(
+                        "NFKD", json_str.encode().decode("unicode_escape")
+                    )
+                    # Remove newlines and extra whitespace
+                    json_str = re.sub(r"\s+", " ", json_str.strip())
                     tool_call = json.loads(json_str)
                     if "type" in tool_call and tool_call["type"] == "function":
                         tool_calls.append(tool_call)
                 except json.JSONDecodeError as e:
                     print(f"[ERROR] JSON parse error: {json_str} - {str(e)}")
+                    continue
+                except UnicodeDecodeError as e:
+                    print(f"[ERROR] Unicode decode error: {json_str} - {str(e)}")
                     continue
 
         if not tool_calls:
