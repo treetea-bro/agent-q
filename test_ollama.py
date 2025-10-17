@@ -1,6 +1,5 @@
 import asyncio
 import io
-import json
 
 import ollama
 from icecream import ic
@@ -158,21 +157,22 @@ async def run_with_xlam(user_input: str):
         ic(response)
 
         try:
-            func_calls = json.loads(response)
-            if isinstance(func_calls, list):
-                for call in func_calls:
-                    fn_name = call.get("name")
-                    args = call.get("arguments", {})
+            func_calls = response.message.tool_calls
 
-                    if fn_name == "search":
-                        params = SearchParams(**args)
-                        await search(params)
-                    elif fn_name == "apply_youtube_filters":
-                        params = FilterParams(**args)
-                        await apply_youtube_filters(params)
-                    elif fn_name == "click_video_by_title":
-                        params = ClickVideoParams(**args)
-                        await click_video_by_title(params)
+            # ✅ 3️⃣ 함수 호출 처리
+            for call in func_calls:
+                fn_name = call.function.name
+                args = call.function.arguments
+
+                if fn_name == "search":
+                    params = SearchParams(**args)
+                    await search(params)
+                elif fn_name == "apply_youtube_filters":
+                    params = FilterParams(**args)
+                    await apply_youtube_filters(params)
+                elif fn_name == "click_video_by_title":
+                    params = ClickVideoParams(**args)
+                    await click_video_by_title(params)
 
         except Exception as error:
             ic(error)
@@ -180,7 +180,5 @@ async def run_with_xlam(user_input: str):
 
 if __name__ == "__main__":
     asyncio.run(
-        run_with_xlam(
-            "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
-        )
+        run_with_xlam("Search for Pokémon AMV, apply 4K filter, then click first video")
     )
