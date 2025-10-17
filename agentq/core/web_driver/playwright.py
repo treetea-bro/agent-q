@@ -311,7 +311,7 @@ class PlaywrightManager:
             await page.goto(
                 self._homepage, timeout=10000, wait_until="networkidle"
             )  # 10 seconds timeout
-            await page.wait_for_load_state("domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
         except Exception as e:
             logger.error(f"Failed to navigate to homepage: {e}")
 
