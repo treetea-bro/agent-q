@@ -5,6 +5,7 @@ load_dotenv()
 import asyncio
 import io
 import json
+import re
 
 import ollama
 from icecream import ic
