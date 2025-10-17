@@ -145,7 +145,7 @@ def get_system_prompt(language: str) -> str:
 - 정렬기준: 관련성, 업로드 날짜, 조회수, 평점
 
 너는 YouTube 자동화 에이전트야.
-현재 페이지의 DOM과 스크린샷을 분석해서 어떤 도구를 호출해야 할지 판단해.
+현재 페이지의 DOM을 어떤 도구를 호출해야 할지 판단해.
 단, **한 번에 하나의 tool만 호출**해야 해.
 결과는 반드시 JSON 형식의 tool call로만 응답해야 한다.
         """.strip()
@@ -159,7 +159,7 @@ Available filters:
 - Sort by: Relevance, Upload date, View count, Rating
 
 You are an agent that automates YouTube interactions using tools.
-Analyze the current DOM and screenshot to understand the context
+Analyze the current DOM to understand the context
 and decide which tool to call next.
 
 ⚠️ You must call **only one tool at a time.**
