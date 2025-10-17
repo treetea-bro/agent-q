@@ -139,47 +139,34 @@ async def run_with_llama(user_input: str):
     await playwright.async_initialize()
     model_name = "llama4:latest"
 
-    # Initial screenshot
-    screenshot_bytes = await get_current_screen()
-    messages = [
-        {"role": "system", "content": LLM_SYSTEM_PROMPT},
-        {"role": "user", "content": user_input, "images": [screenshot_bytes]},
-    ]
-    max_steps = 5  # Maximum steps to prevent infinite loops
-
-    for step in range(max_steps):
-        # Ollama call
+    for step in range(5):
         print("ollama start")
-        try:
-            response = await ollama.AsyncClient().chat(
-                model=model_name,
-                messages=messages,
-                tools=TOOLS,
-                options={"temperature": 0.5, "num_ctx": 8192},
-            )
-            print("ollama end")
-            ic(response)
-        except Exception as e:
-            print(f"[ERROR] Ollama call failed: {str(e)}")
-            break
+        screenshot_bytes = await get_current_screen()
+        messages = [
+            {"role": "system", "content": LLM_SYSTEM_PROMPT},
+            {"role": "user", "content": user_input, "images": [screenshot_bytes]},
+        ]
 
-        # Parse tool calls
+        response = await ollama.AsyncClient().chat(
+            model=model_name,
+            messages=messages,
+            tools=TOOLS,
+        )
+        print("ollama end")
+        ic(response)
+
         tool_calls = []
         if "message" in response and "content" in response["message"]:
             content = response["message"]["content"]
-            # Remove special tags and clean content
             clean_content = re.sub(r"<\|.*?\|\>", "", content).strip()
-            # Find complete JSON objects using a more robust regex
             json_matches = re.findall(
                 r"\{(?:[^{}]|\{[^{}]*\})*\}", clean_content, re.DOTALL
             )
             for json_str in json_matches:
                 try:
-                    # Decode Unicode escape sequences
                     json_str = unicodedata.normalize(
                         "NFKD", json_str.encode().decode("unicode_escape")
                     )
-                    # Remove newlines and extra whitespace
                     json_str = re.sub(r"\s+", " ", json_str.strip())
                     tool_call = json.loads(json_str)
                     if "type" in tool_call and tool_call["type"] == "function":
@@ -191,11 +178,6 @@ async def run_with_llama(user_input: str):
                     print(f"[ERROR] Unicode decode error: {json_str} - {str(e)}")
                     continue
 
-        if not tool_calls:
-            print("No valid tool calls generated. Stopping.")
-            break
-
-        # Execute tool calls
         for call in tool_calls:
             fn_name = call.get("name")
             args = call.get("parameters", {})
@@ -218,26 +200,6 @@ async def run_with_llama(user_input: str):
                     await click_video_by_title(params)
             except Exception as e:
                 print(f"[ERROR] Tool execution failed for {fn_name}: {str(e)}")
-
-        # Update screenshot and messages for the next step
-        print("screenshot start")
-        screenshot_bytes = await get_current_screen()
-        print("screenshot end")
-        messages.append(
-            {"role": "assistant", "content": response["message"]["content"]}
-        )
-        messages.append(
-            {
-                "role": "user",
-                "content": "Continue based on the new page state.",
-                "images": [screenshot_bytes],
-            }
-        )
-
-        # Stop if video was clicked
-        if any("click_video_by_title" in call.get("name", "") for call in tool_calls):
-            print("Video clicked. Task complete.")
-            break
 
 
 if __name__ == "__main__":
