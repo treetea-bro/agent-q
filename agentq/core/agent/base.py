@@ -68,9 +68,14 @@ class BaseAgent:
         if not self.keep_message_history:
             self._initialize_messages()
 
-        content = input_data.model_dump_json(
-            exclude={"current_page_dom", "current_page_url"}
+        content = (
+            self.system_prompt
+            + "\n\n"
+            + input_data.model_dump_json(
+                exclude={"current_page_dom", "current_page_url"}
+            )
         )
+
         if hasattr(input_data, "current_page_dom") and hasattr(
             input_data, "current_page_url"
         ):
