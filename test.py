@@ -3,9 +3,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
+import io
 import json
 
+import ollama
 from icecream import ic
+from PIL import Image
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from agentq.core.skills.get_dom_with_content_type import get_dom_with_content_type
@@ -33,6 +36,21 @@ async def get_current_dom() -> str:
     await wait_for_navigation()
     dom = await get_dom_with_content_type(content_type="all_fields")
     return "\n\nCurrent DOM: " + str(dom)
+
+
+async def get_current_screenshot() -> bytes:
+    await wait_for_navigation()
+    page = await playwright.get_current_page()
+    screenshot_bytes = await page.screenshot(full_page=True)
+
+    # Resize to 896x896 using PIL
+    img = Image.open(io.BytesIO(screenshot_bytes))
+    img = img.resize((896, 896), Image.LANCZOS)
+
+    # Convert back to bytes (JPEG format)
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format="JPEG")
+    return img_byte_arr.getvalue()
 
 
 # ==============================
@@ -130,6 +148,8 @@ Available filters:
 - Duration: Under 4 minutes, 4 - 20 minutes, Over 20 minutes
 - Features: Live, 4K, HD, Subtitles/CC, Creative Commons, 360°, VR180, 3D, HDR
 - Sort by: Relevance, Upload date, View count, Rating
+
+You are an agent that automates YouTube interactions using tools. Analyze the current screenshot of the page to understand the context and decide which tool to call next. Respond with tool calls in JSON format.
 """
 
 
@@ -184,9 +204,65 @@ async def run_with_xlam(user_input: str):
         ic(error)
 
 
+# if __name__ == "__main__":
+#     asyncio.run(
+#         run_with_xlam(
+#             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
+#         )
+#     )
+
+
+# ==============================
+# ⚡ Function Calling Runner with Gemma 3
+# ==============================
+async def run_with_gemma(user_input: str):
+    await playwright.async_initialize()
+
+    # Get current screenshot as bytes (resized to 896x896)
+    screenshot_bytes = await get_current_screenshot()
+
+    messages = [
+        {"role": "system", "content": LLM_SYSTEM_PROMPT},
+        {"role": "user", "content": user_input, "images": [screenshot_bytes]},
+    ]
+
+    # Call Ollama with tools
+    response = ollama.chat(
+        model="gemma3:27b",
+        messages=messages,
+        tools=TOOLS,
+        options={"temperature": 0.5},  # Adjust as needed
+    )
+
+    ic(response)
+
+    # Parse tool calls from response
+    if "message" in response and "tool_calls" in response["message"]:
+        tool_calls = response["message"]["tool_calls"]
+        for call in tool_calls:
+            fn_name = call["function"]["name"]
+            args = call["function"]["arguments"]  # This is a dict
+
+            if fn_name == "search":
+                params = SearchParams(**args)
+                await search(params)
+            elif fn_name == "apply_youtube_filters":
+                params = FilterParams(**args)
+                await apply_youtube_filters(params)
+            elif fn_name == "click_video_by_title":
+                params = ClickVideoParams(**args)
+                await click_video_by_title(params)
+
+            # After each tool call, optionally get new screenshot and call model again if needed
+            # But original code is single pass, so keeping it sequential without loop
+
+    else:
+        print("No tool calls generated.")
+
+
 if __name__ == "__main__":
     asyncio.run(
-        run_with_xlam(
+        run_with_gemma(
             "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
         )
     )
