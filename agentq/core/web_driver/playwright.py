@@ -308,15 +308,11 @@ class PlaywrightManager:
     async def go_to_homepage(self):
         page: Page = await PlaywrightManager.get_current_page(self)
         try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
+            await page.goto(
+                self._homepage, timeout=10000, wait_until="networkidle"
+            )  # 10 seconds timeout
         except Exception as e:
             logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
-        try:
-            await page.goto(self._homepage, timeout=10000)  # 10 seconds timeout
-        except Exception as e:
-            logger.error(f"Failed to navigate to homepage: {e}")
-            # implement a retry mechanism here
 
     async def set_navigation_handler(self):
         page: Page = await PlaywrightManager.get_current_page(self)
