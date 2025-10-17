@@ -100,73 +100,26 @@ model = AutoModelForCausalLM.from_pretrained(
 
 
 # ==============================
-# 🌐 YouTube Language Detection
+# 📝 Instruction
 # ==============================
-async def detect_youtube_lang():
-    page = await playwright.get_current_page()
-    lang = await page.get_attribute("html", "lang")
-    if lang:
-        lang = lang.lower()
-        if lang.startswith("ko"):
-            return "ko"
-        elif lang.startswith("en"):
-            return "en"
-    # 기본값 영어
-    return "en"
-
-
-def get_system_prompt(lang: str) -> str:
-    if lang == "ko":
-        return """
-You are a YouTube automation assistant.
-사용자의 요청을 수행하기 위해 필요한 모든 단계를 실행하세요.
-응답은 반드시 `name`과 `arguments`를 가진 JSON 배열로만 제공합니다.
-
-사용 가능한 액션: search, apply_youtube_filters, click_video_by_title
-
-사용 가능한 필터 (한글):
-- 업로드 날짜: 지난 1시간, 오늘, 이번 주, 이번 달, 올해
-- 구분: 동영상, 채널, 재생목록, 영화
-- 길이: 4분 미만, 4~20분, 20분 초과
-- 기능별: 라이브, 4K, HD, 자막, 크리에이티브 커먼즈, 360°, VR180, 3D, HDR
-- 위치: 구입한 항목
-- 정렬기준: 관련성, 업로드 날짜, 조회수, 평점
-"""
-    else:
-        # 영어
-        return """
-You are a YouTube automation assistant.
-Execute all steps needed to fulfill the user's request.
-Respond ONLY in a JSON array of actions with `name` and `arguments`.
-
-Available actions: search, apply_youtube_filters, click_video_by_title
-
+LLM_SYSTEM_PROMPT = """
 Available filters:
 - Upload date: Last hour, Today, This week, This month, This year
 - Type: Video, Channel, Playlist, Movie
 - Duration: Under 4 minutes, 4 - 20 minutes, Over 20 minutes
 - Features: Live, 4K, HD, Subtitles/CC, Creative Commons, 360°, VR180, 3D, HDR
-- Location: Purchased
 - Sort by: Relevance, Upload date, View count, Rating
 """
 
 
 # ==============================
-# ⚡ Function Calling Runner (리팩토링)
+# ⚡ Function Calling Runner
 # ==============================
 async def run_with_xlam(user_input: str):
     await playwright.async_initialize()
 
-    # YouTube 언어 감지
-    lang = await detect_youtube_lang()
-    print("Detected YouTube language:", lang)
-
-    # 언어별 시스템 프롬프트 설정
-    system_prompt = get_system_prompt(lang)
-    print(system_prompt)
-
     prompt = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": LLM_SYSTEM_PROMPT},
         {"role": "user", "content": user_input},
     ]
 
@@ -216,6 +169,6 @@ async def run_with_xlam(user_input: str):
 if __name__ == "__main__":
     asyncio.run(
         run_with_xlam(
-            "Search for Pokémon AMV, apply 4K filter, then click the POKEMON [AMV] Legends Never Die"
+            "Search for Pokémon AMV, apply 4K filter, then click the full battle video"
         )
     )
