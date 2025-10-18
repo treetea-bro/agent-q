@@ -50,12 +50,22 @@ async def get_current_screenshot() -> bytes:
 # ==============================
 # 🧰 YouTube Functions
 # ==============================
+# async def search(params: SearchParams):
+#     print(f"🔍 Searching: {params.query}")
+#     page = await playwright.get_current_page()
+#     await page.wait_for_selector('input[name="search_query"]')
+#     await page.fill('input[name="search_query"]', params.query)
+#     await page.press('input[name="search_query"]', "Enter")
+#     await page.wait_for_selector("ytd-item-section-renderer", timeout=10000)
+
+
 async def search(params: SearchParams):
     print(f"🔍 Searching: {params.query}")
     page = await playwright.get_current_page()
-    await page.wait_for_selector('input[name="search_query"]')
-    await page.fill('input[name="search_query"]', params.query)
-    await page.press('input[name="search_query"]', "Enter")
+
+    await page.wait_for_selector('pierce/input[name="search_query"]', timeout=10000)
+    await page.locator('pierce/input[name="search_query"]').fill(params.query)
+    await page.locator('pierce/input[name="search_query"]').press("Enter")
     await page.wait_for_selector("ytd-item-section-renderer", timeout=10000)
 
 
