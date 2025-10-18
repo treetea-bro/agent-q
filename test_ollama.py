@@ -63,10 +63,22 @@ async def search(params: SearchParams):
     print(f"🔍 Searching: {params.query}")
     page = await playwright.get_current_page()
 
-    await page.wait_for_selector('pierce/input[name="search_query"]', timeout=10000)
-    await page.locator('pierce/input[name="search_query"]').fill(params.query)
-    await page.locator('pierce/input[name="search_query"]').press("Enter")
+    # 🔸 Shadow DOM 내부까지 탐색 가능한 locator 사용
+    search_box = page.locator('pierce=input[name="search_query"]')
+
+    # 🔸 검색창이 로드될 때까지 대기
+    await search_box.wait_for(state="visible", timeout=10000)
+
+    # 🔸 검색어 입력
+    await search_box.fill(params.query)
+
+    # 🔸 엔터키로 검색 실행
+    await search_box.press("Enter")
+
+    # 🔸 결과 목록 로드 대기
     await page.wait_for_selector("ytd-item-section-renderer", timeout=10000)
+
+    print("✅ Search completed successfully.")
 
 
 async def apply_youtube_filters(params: FilterParams, timeout: int = 10000):
