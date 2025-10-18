@@ -1,14 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Literal
 
 
-class YoutubeFilter(BaseModel):
-    group_name: str = Field(
-        ..., description="필터 그룹 이름 (예: 'Upload date', 'Type', 'Duration')"
-    )
-    option_label: str = Field(
-        ...,
-        description="선택할 옵션 라벨 (예: 'This week', 'Video', 'Under 4 minutes')",
-    )
+class FilterOption(BaseModel):
+    group_name: Literal["업로드 날짜", "구분", "길이", "기능별", "위치", "정렬기준"]
+    option_label: str
 
 
 class SearchParams(BaseModel):
@@ -16,7 +11,7 @@ class SearchParams(BaseModel):
 
 
 class FilterParams(BaseModel):
-    filters: list[YoutubeFilter] = Field(..., description="적용할 유튜브 필터 리스트")
+    filters: list[FilterOption] = Field(..., description="적용할 유튜브 필터 리스트")
 
 
 class ClickVideoParams(BaseModel):
